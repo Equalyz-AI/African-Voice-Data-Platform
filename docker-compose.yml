@@ -1,0 +1,26 @@
+services:
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./local_db:/app/local_db
+      - .:/app
+    env_file: .env
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    restart: on-failure
+    depends_on:
+      - redis
+
+  redis:
+    image: redis/redis-stack-server:latest
+    container_name: redis-stack
+    ports:
+      - "6379:6379"
+      - "8001:8001"
+    volumes:
+      - redis_data:/data
+    restart: on-failure
+
+volumes:
+  redis_data:

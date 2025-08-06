@@ -5,3 +5,22 @@ MYREADME.md
 samples/
 __pycache__/
 
+temp_files/
+
+google_upload_to_db.py
+drive_client.py
+account.json
+push_to_db_local_sheets.py
+
+data/
+
+
+src/**/*.pyc
+app.log
+
+ docker compose down --remove-orphans
+ docker compose up -d --build
+
+
+
+*.py

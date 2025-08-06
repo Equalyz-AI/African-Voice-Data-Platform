@@ -8,13 +8,13 @@ def send_verification_email(to_email: str, name: str, verification_token: str):
     verification_link = f"{settings.FRONTEND_URL}/auth/verify-email?token={verification_token}"
 
     params: resend.Emails.SendParams = {
-        "from": f"AIforGoV <noreply@genaigov.ai>",
+        "from": f"African Voices <noreply@genaigov.ai>",
         "to": [to_email],
         "subject": "Verify Your Email Address",
         "html": f"""
             <html>
                 <body>
-                    <h2>Welcome to the African Voices Platform/h2>
+                    <h2>Welcome to the African Voices Platform</h2>
                     <h4>Email Verification</h4>
                     <p>Hello {name}, Click the link below to verify your email address:</p>
                     <a href="{verification_link}">Verify Email</a>
@@ -34,7 +34,7 @@ def send_reset_password_email(to_email: str, reset_token: str):
     reset_link = f"{settings.FRONTEND_URL}/auth/reset-password?token={reset_token}"
 
     params: resend.Emails.SendParams = {
-        "from": f"AIforGoV <oreply@genaigov.ai>",
+        "from": f"African Voices <oreply@genaigov.ai>",
         "to": [to_email],
         "subject": "Reset Your Password",
         "html": f"""

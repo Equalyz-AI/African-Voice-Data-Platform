@@ -18,6 +18,10 @@ class Categroy(str, Enum):
     spontaneous = "spontaneous"
     read_as_spontaneous = "read_as_spontaneous"
 
+class GenderEnum(str, Enum):
+    male = "male"
+    female = "female"
+
 
 class User(SQLModel, table=True):
     __tablename__ = "users"
@@ -41,13 +45,11 @@ class User(SQLModel, table=True):
     feedback: List["Feedback"] = Relationship(back_populates="user")
 
 
-
 class AudioSample(SQLModel, table=True):
     __table_args__ = (
         CheckConstraint("snr >= 0", name="check_snr_non_negative"),
         CheckConstraint("gender IN ('male','female')", name="check_valid_gender"),
     )
-
     id: str = Field(
         sa_column=Column(
             pg.VARCHAR,
@@ -56,27 +58,25 @@ class AudioSample(SQLModel, table=True):
             default=lambda: str(uuid.uuid4())
         )
     )
-    dataset_id: str = Field(foreign_key="dataset.id")
+
+    dataset_id: Optional[str] = Field(foreign_key="dataset.id", nullable=True, default="naija")
+    annotator_id: str
+    sentence_id: str
+    sentence: str
+    storage_link: str
+    gender: Optional[str] =  Field(sa_column=Column(pg.VARCHAR, default=None))
+
+    age_group: Optional[str] =  Field(sa_column=Column(pg.VARCHAR, default=None, nullable=True))
+    edu_level: Optional[str] =  Field(sa_column=Column(pg.VARCHAR, default=None, nullable=True))
+    durations: Optional[str] =  Field(sa_column=Column(pg.VARCHAR, default=None, nullable=True))
+
+    language: Optional[str] =  Field(sa_column=Column(pg.VARCHAR, default='naija'))
+    snr:  Optional[int] = Field(sa_column=Column(pg.INTEGER, default=40))
+
+    domain: Optional[str] =  Field(sa_column=Column(pg.VARCHAR, default=None))
     category: str = Field(sa_column=Column(pg.VARCHAR, default=Categroy.read))
-    audio_path: str
-    duration: float
-    transcript: Optional[str] = None
-    speaker_id: Optional[str] = None
-    transcript_id: Optional[str] = None
-    language: str = Field(default="pidgin")
-    sample_rate: int = Field(default=80000)
-    snr: float = Field(default=40.0)
-    approval: str = Field(default="approved")
-    gender: str = Field(default="male")
-    age: Optional[int] = Field(default=25)
-    education: Optional[str] = Field(default=None)
-    domain: Optional[str] = Field(default="Finance")
-
-    uploaded_at: datetime = Field(default_factory=datetime.utcnow)
     created_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, default=datetime.now))
-
-
-
+    uploaded_at: datetime = Field(default_factory=datetime.utcnow)
 
 
 

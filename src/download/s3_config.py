@@ -16,7 +16,8 @@ s3 = boto3.client(
 BUCKET = settings.S3_BUCKET_NAME
 
 
-SUPPORTED_LANGUAGES = {"yoruba", "hausa", "pidgin", "igbo"}
+SUPPORTED_LANGUAGES = {"Naija", "Yoruba", "Hausa", "Igbo"}
+#  "yoruba", "hausa", "pidgin", "igbo"
 
 COLUMNS=[
     "transcript", "sample_rate", "snr",
@@ -25,7 +26,7 @@ COLUMNS=[
 ]
 
 VALID_PERCENTAGES = {5, 20, 40, 50, 60, 80, 100}
-VALID_CATEGORIES = {"read", "spontaneous"}
+VALID_CATEGORIES = {"read", "spontaneous", "read_as_spontaneous"}
 
 
 
