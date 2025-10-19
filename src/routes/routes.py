@@ -23,7 +23,7 @@ def map_all_to_none(value: Optional[str], language: Optional[str] = None) -> Opt
     if not value:
         return None
     val = value.lower()
-    lang = language.lower()
+    lang = language.lower() if language else None
 
     if val == "all":
         return None

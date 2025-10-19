@@ -15,7 +15,7 @@ class ExportJobCreate(BaseModel):
 class ExportJobStatus(BaseModel):
     id: Optional[str] = None
     status: Optional[str] = None
-    message: Optional[str] = "Sit tight, we're zipping your files up"
+    message: Optional[str] = "Sit tight, we're zipping your files up and sending them to you."
     language: Optional[str] = None
     percentage: Optional[float] = None
     progress_pct: Optional[int] = None
