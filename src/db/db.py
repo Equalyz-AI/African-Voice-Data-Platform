@@ -22,8 +22,14 @@ def _get_ssl_context():
     """Create SSL context for secure PostgreSQL connections."""
     ssl_context = create_default_context()
     ssl_context.check_hostname = True
-    ssl_context.verify_mode = CERT_REQUIRED  # ✅ ONLY THIS LINE - remove the string assignment
+    ssl_context.verify_mode = CERT_REQUIRED 
     return ssl_context
+
+
+def _get_ssl_context_none():
+    """Return None to disable SSL for local Docker Postgres."""
+    return None
+
 
 def get_async_engine():
     """Get or create the async engine (lazy initialization)."""
@@ -33,7 +39,7 @@ def get_async_engine():
             f"postgresql+asyncpg://{settings.PGUSER}:{settings.PGPASSWORD}@"
             f"{settings.PGHOST}:{settings.PGPORT}/{settings.PGDATABASE}"
         )
-        
+
         _async_engine = create_async_engine(
             DATABASE_URL,
             echo=False,
@@ -43,7 +49,7 @@ def get_async_engine():
             pool_recycle=900,
             pool_timeout=30,
             connect_args={
-                "ssl": _get_ssl_context(),
+                "ssl": _get_ssl_context_none(),
                 "timeout": 60,
                 "command_timeout": 300,
                 "server_settings": {
@@ -82,7 +88,7 @@ def get_async_session_maker(force_new: bool = False) -> async_sessionmaker[Async
             pool_recycle=900,
             pool_timeout=30,
             connect_args={
-                "ssl": _get_ssl_context(),
+                "ssl": _get_ssl_context_none(),
                 "timeout": 60,
                 "command_timeout": 300,
                 "server_settings": {

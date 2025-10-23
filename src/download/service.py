@@ -341,26 +341,3 @@ class DownloadService:
             samples=samples,
             as_excel=as_excel
         )
-
-
-
-
-# # Stream ZIP
-        # try:
-        #     zip_stream, zip_filename = await stream_zip_to_s3(
-        #             samples, self.s3_bucket_name, 
-        #             as_excel=as_excel, 
-        #             language=language, 
-        #             pct=pct, 
-        #             category=category
-        #         )
-        # except Exception as e:
-        #     raise HTTPException(500, f"Failed to generate ZIP: {e}")
-
-        # return StreamingResponse(
-        #     zip_stream,
-        #     media_type="application/zip",
-        #     headers={
-        #         "Content-Disposition": f"attachment; filename={zip_filename}"
-        #     }
-        # )

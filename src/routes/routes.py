@@ -79,7 +79,6 @@ async def preview_audio_samples(
     category = Category(category) if category else None
     language = language.lower()
 
-
     print("This is the category and language after the mapping: ", category, language, "\n\n")
     return await download_service.preview_audio_samples(
         session=session, 

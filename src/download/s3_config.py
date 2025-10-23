@@ -1,6 +1,7 @@
 import boto3
 from dotenv import load_dotenv
 from botocore.client import Config
+from src import config
 from src.config import settings
 from typing import Optional
 from obs import ObsClient
@@ -15,7 +16,11 @@ s3_aws = boto3.client(
     aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
     aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
     region_name=settings.AWS_REGION,
-    endpoint_url=settings.AWS_ENDPOINT_URL
+    endpoint_url=settings.AWS_ENDPOINT_URL,
+    config=Config(
+        s3={'addressing_style': 'path'},
+        max_pool_connections=50
+    )
 )
 
 
@@ -27,7 +32,8 @@ s3_obs = boto3.client(
     region_name="cn-global-1",
     config=Config(
         s3={'addressing_style': 'path'},
-        signature_version='s3v4'
+        signature_version='s3v4',
+        max_pool_connections=50
     ),
 
 )

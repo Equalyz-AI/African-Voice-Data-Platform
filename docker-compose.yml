@@ -39,7 +39,7 @@ services:
 
   celery:
     build: .
-    command: celery -A src.core.celery_app worker -l info --concurrency=4
+    command: celery -A src.core.celery_app worker -l info --concurrency=16
     depends_on:
       - redis
       - db

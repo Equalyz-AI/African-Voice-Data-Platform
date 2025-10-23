@@ -278,10 +278,23 @@ async def async_create_dataset_zip_s3_impl(
             readme_content = generate_readme(language, pct, False, processed_count, last_sentence_id)
             zs.add(iter([readme_content.encode("utf-8")]), arcname="README.txt")
             
-            stream_zip_to_s3_blocking(zs, bucket=settings.S3_BUCKET_NAME, key=export_filename)
+            # stream_zip_to_s3_blocking(zs, bucket=settings.S3_BUCKET_NAME, key=export_filename)
+            await asyncio.to_thread(
+                stream_zip_to_s3_blocking, 
+                zs, 
+                bucket=settings.S3_BUCKET_NAME, 
+                key=export_filename
+            )
 
         # Generate presigned URL
-        download_url = s3_aws.generate_presigned_url(
+        # download_url = s3_aws.generate_presigned_url(
+        #     'get_object',
+        #     Params={'Bucket': settings.S3_BUCKET_NAME, 'Key': export_filename},
+        #     ExpiresIn=86400
+        # )
+
+        download_url = await asyncio.to_thread(
+            s3_aws.generate_presigned_url,
             'get_object',
             Params={'Bucket': settings.S3_BUCKET_NAME, 'Key': export_filename},
             ExpiresIn=86400
