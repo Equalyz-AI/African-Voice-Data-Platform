@@ -46,6 +46,8 @@ pandas
 esdk-obs-python
 
 
+tenacity
+
 flower
 
 
