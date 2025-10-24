@@ -6,6 +6,8 @@ import asyncio
 from typing import Iterable, Optional
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 from botocore.exceptions import BotoCoreError
+from botocore.exceptions import ResponseStreamingError
+
 from src.core.celery_app import celery_app
 from src.db.db import get_async_session_maker
 from src.db.models import DownloadStatusEnum
@@ -37,12 +39,22 @@ BYTES_PER_SAMPLE = 2
 @retry(
     stop=stop_after_attempt(5),
     wait=wait_exponential(multiplier=1, min=2, max=30),
-    # Retry on common S3/network errors
-    retry=retry_if_exception_type(BotoCoreError) 
+    retry=retry_if_exception_type((ResponseStreamingError, BotoCoreError))
 )
-def get_s3_object_with_retry(bucket_name, key):
-    """Retries the S3 get_object call if a transient network error occurs."""
-    return s3_obs.get_object(Bucket=bucket_name, Key=key)
+def get_s3_stream_for_file_with_retry(bucket_name, key):
+    """
+    Attempts to download the S3 object. If streaming fails, the entire
+    operation (including the initial API call) will be retried up to 5 times.
+    """
+    obj = s3_obs.get_object(Bucket=bucket_name, Key=key)
+    s3_body = obj["Body"]
+    return s3_stream_bytes(s3_body)
+
+
+def download_s3_bytes(bucket, key):
+    obj = s3_obs.get_object(Bucket=bucket, Key=key)
+    return obj['Body'].read()
+
 
 
 def s3_stream_bytes(s3_body, chunk_size=64 * 1024) -> Iterable[bytes]:
@@ -247,16 +259,35 @@ async def async_create_dataset_zip_s3_impl(
                 folder = map_category_to_folder(sample.language, sample.category)
                 key = f"{sample.language.lower()}-test/{folder}/{sample.sentence_id}.wav"
                 
+                # try:
+                #     # obj = s3_obs.get_object(Bucket=settings.OBS_BUCKET_NAME, Key=key)
+                #     s3_stream_generator = await asyncio.to_thread(
+                #         get_s3_stream_for_file_with_retry, 
+                #         settings.OBS_BUCKET_NAME, 
+                #         key
+                #     )
+                    
+                #     try:
+                #         zs.add(s3_stream_generator, arcname=arcname)
+                    
+                #     except ResponseStreamingError as stream_e:
+                #         raise stream_e  # Re-raise to be caught by the outer block if possible, 
+                #                     # or handle retry logic here if applicable. 
+                #                     # For now, let's just log and skip:
+
+                #         logger.warning(f"S3 STREAMING ERROR for {key}: {stream_e}. Skipping file.")
+                #         continue
+
+                # except Exception as e:
+                #     logger.warning(f"Skipping missing audio for job {job_id}: {key} - {e}")
+                #     continue
+
+                
                 try:
-                    # obj = s3_obs.get_object(Bucket=settings.OBS_BUCKET_NAME, Key=key)
-                    obj = await asyncio.to_thread(
-                        get_s3_object_with_retry, 
-                        settings.OBS_BUCKET_NAME, 
-                        key
-                    )
-                    zs.add(s3_stream_bytes(obj["Body"]), arcname=arcname)
+                    file_bytes = await asyncio.to_thread(download_s3_bytes, settings.OBS_BUCKET_NAME, key)
+                    zs.add(iter([file_bytes]), arcname=arcname)
                 except Exception as e:
-                    logger.warning(f"Skipping missing audio for job {job_id}: {key} - {e}")
+                    logger.warning(f"Failed to download {key}: {e}")
                     continue
                 
                 row = (
