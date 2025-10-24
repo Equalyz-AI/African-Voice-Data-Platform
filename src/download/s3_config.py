@@ -4,7 +4,6 @@ from botocore.client import Config
 from src import config
 from src.config import settings
 from typing import Optional
-from obs import ObsClient
 from urllib.parse import urlparse
 import hmac, hashlib, base64, time, urllib.parse
 
@@ -31,7 +30,7 @@ s3_obs = boto3.client(
     endpoint_url="https://obsv3.cn-global-1.gbbcloud.com", 
     region_name="cn-global-1",
     config=Config(
-        s3={'addressing_style': 'path'},
+        s3={'addressing_style': 'virtual'},
         signature_version='s3v4',
         max_pool_connections=50
     ),
