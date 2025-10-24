@@ -91,20 +91,23 @@ class AccountNotVerified(AfricanVoicesStorageException):
 
 def create_exception_handler(
     status_code: int,
-    initial_detail: str = "An unexpected error occurred"
+    initial_detail: dict = None
 ) -> Callable[[Request, AfricanVoicesStorageException], JSONResponse]:
+
+    initial_detail = initial_detail or {}
 
     async def exception_handler(request: Request, exc: AfricanVoicesStorageException):
         return JSONResponse(
             status_code=status_code,
             content={
-                "message": exc.message or initial_detail,
-                "error_code": initial_detail["error_code"] or exc.error_code,
-                "resolution": initial_detail["resolution"] or "Please try again later",
+                "message": exc.message or initial_detail.get("message", "An unexpected error occurred"),
+                "error_code": exc.error_code or initial_detail.get("error_code", "unknown_error"),
+                "resolution": initial_detail.get("resolution", "Please try again later"),
             }
         )
 
     return exception_handler
+
 
 
 

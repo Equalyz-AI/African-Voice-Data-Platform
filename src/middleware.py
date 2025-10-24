@@ -52,6 +52,8 @@ allowed_origins = [
     "https://www.genaigov.ai",
     "https://genaigov.ai",
     "https://api.genaigov.ai",
+    "https://africanvoices.io",
+    "https://main.d1wrs85izeeycs.amplifyapp.com",
 ]
 
 
@@ -156,5 +158,7 @@ app.add_middleware(
         "api.genaigov.ai",
         "genaigov.ai",
         "www.genaigov.ai",
+        "africanvoices.io",
+        "main.d1wrs85izeeycs.amplifyapp.com"
     ]
 )
