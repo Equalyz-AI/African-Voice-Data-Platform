@@ -128,8 +128,10 @@ def map_category_to_folder(language: str, category: Optional[str] = None) -> str
     category = (category or "spontaneous").lower()
 
     # For both Language and Category
+    if category == "spontaneous" and language in "hausa":
+        return "spontaneous"
     if category == "spontaneous":
-        if language in ["yoruba", "naija", "hausa"]:
+        if language in ["yoruba", "naija"]:
             return "read-as-spontaneous"
     elif category == "read" and language in ["yoruba"]:
         return "read-as-spontaneous"

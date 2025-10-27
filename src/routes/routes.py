@@ -33,7 +33,7 @@ def map_all_to_none(value: Optional[str], language: Optional[str] = None) -> Opt
         if lang in ["yoruba"]:
             print(f"Mapping the category {val} to spontaneous")
             return "spontaneous"
-    
+                
     print(f"This is the language coming from the backend")
     return val
 
