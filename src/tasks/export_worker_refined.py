@@ -189,7 +189,7 @@ async def async_create_dataset_zip_s3_impl(
             session, job_id, DownloadStatusEnum.PROCESSING, progress_pct=0
         )
 
-    export_filename = f"exports/{language}_{pct}pct_{job_id}.zip"
+    export_filename = f"exports/{language}_{pct}pct_{job_id}_{category}_{domain}_{split}.zip"
     
     try:
         # Initialize the S3 client factory and get the current event loop
