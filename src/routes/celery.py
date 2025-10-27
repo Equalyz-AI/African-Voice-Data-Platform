@@ -41,7 +41,7 @@ async def enqueue_export_job(
     """Enqueue export job and return job ID for tracking."""
     from .routes import map_all_to_none, map_EV_to_EV
     # Enqueue task with job ID
-    from src.tasks.export_worker import create_dataset_zip_s3_task_new
+    from src.tasks.export_worker_refined import create_dataset_zip_s3_task_new
     
     # Sanitize inputs
     gender = map_all_to_none(value=gender)
