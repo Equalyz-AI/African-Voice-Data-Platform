@@ -7,7 +7,7 @@ from functools import partial
 # External dependencies used:
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 from botocore.exceptions import BotoCoreError, ResponseStreamingError
-from zipstream import ZipStream, ZIP_DEFLATED
+from zipstream import ZIP_STORED, ZipStream, ZIP_DEFLATED
 from aiobotocore.session import get_session
 import aiobotocore.client
 
@@ -231,7 +231,8 @@ async def async_create_dataset_zip_s3_impl(
                 }
 
             # 3. Setup ZipStream and metadata
-            zs = ZipStream(compress_type=ZIP_DEFLATED, compress_level=5)
+            # zs = ZipStream(compress_type=ZIP_DEFLATED, compress_level=5)
+            zs = ZipStream(compress_type=ZIP_STORED)
             processed_count = 0
             # ... (metadata setup - original lines 251-254) ...
             all_metadata_rows = [
