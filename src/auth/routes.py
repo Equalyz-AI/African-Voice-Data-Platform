@@ -55,7 +55,11 @@ async def login(
     """Login user and return access token."""
     user_service = UserService()
 
-    user = await user_service.authenticate_user(form_data.email, form_data.password, session)
+    user = await user_service.authenticate_user(
+        form_data.email, 
+        form_data.password, 
+        session
+    )
     access_token = create_access_token(user=user)
 
     # Set the access token as a cookie

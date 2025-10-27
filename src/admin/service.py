@@ -3,7 +3,8 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from typing import List
 import uuid, io, pandas as pd
 from src.db.models import AudioSample, Feedback, DownloadLog
-from src.download.s3_config import s3, BUCKET, SUPPORTED_LANGUAGES
+from src.download.s3_config import  SUPPORTED_LANGUAGES, s3_aws
+from src.config import settings
 
 REQUIRED_COLUMNS = {
     "transcript", 
@@ -15,9 +16,11 @@ REQUIRED_COLUMNS = {
     "duration"
 }
 
+s3 = s3_aws
+
 class AdminService:
 
-  def __init__(self, s3_bucket_name: str = BUCKET):
+  def __init__(self, s3_bucket_name: str = settings.S3_BUCKET_NAME):
     self.s3_bucket_name = s3_bucket_name
 
   @staticmethod
@@ -91,7 +94,7 @@ class AdminService:
 
           sample_id = str(uuid.uuid4())
           s3_key = f"datasets/{dataset_id}/{sample_id}.wav"
-          s3.upload_fileobj(file_obj, BUCKET, s3_key)
+          s3.upload_fileobj(file_obj, settings.S3_BUCKET_NAME, s3_key)
 
           sample = AudioSample(
               id=sample_id,

@@ -2,7 +2,8 @@ from fastapi import FastAPI
 from src.auth.routes import auth_router
 from src.auth.google import google_login
 from src.admin.routes import admin_router
-from src.download.routes import download_router
+from src.routes.routes import download_router
+from src.routes.celery import  celery_router
 from src.middleware import register_middleware
 from src.errors import register_all_errors
 import uvicorn, os
@@ -11,7 +12,7 @@ from contextlib import asynccontextmanager
 from redis.asyncio import Redis
 from fastapi.requests import Request
 from typing import cast
-from src.db.redis import init_redis_client
+# from src.db.redis import init_redis_client
 from src.config import settings
 from src.logging_config import setup_logging
 setup_logging()
@@ -32,16 +33,17 @@ version_prefix = f"/api/{version}"
 async def lifespan(app: FastAPI):
 
     try:
-        app.state.redis = await init_redis_client(
-            settings.REDIS_HOST,
-            settings.REDIS_PORT,
-            settings.REDIS_USERNAME,
-            settings.REDIS_PASSWORD,
-        )
+        # app.state.redis = await init_redis_client(
+        #     settings.REDIS_HOST,
+        #     settings.REDIS_PORT,
+        #     settings.REDIS_USERNAME,
+        #     settings.REDIS_PASSWORD,
+        # )
         
-        redis = cast(Redis, app.state.redis)
-        await redis.set("somekey", "Redis is working")
-        await redis.flushdb()
+        # redis = cast(Redis, app.state.redis)
+        # await redis.set("somekey", "Redis is working")
+        # await redis.flushdb()
+        pass
     except Exception as e:
         print(f"Error connecting to Redis: {e}")
 
@@ -111,17 +113,50 @@ app.include_router(
     tags=["Download"]
 )
 
+app.include_router(
+    celery_router,
+    prefix=f"{version_prefix}/celery",
+    tags=["Celery"]
+)
+
+
+
+# if __name__ == "__main__":
+#     ENV = os.getenv("ENV", "development")
+#     PORT = int(os.getenv("PORT", 8000))
+#     HOST = "localhost" if ENV == "production" else "localhost"
+
+#     uvicorn.run(
+#         app="main:app",
+#         host="localhost",
+#         port=PORT,
+#         reload=True if ENV == "development" else False,
+#         proxy_headers=True
+#     )
 
 
 if __name__ == "__main__":
+    import os
+    import platform
+    import uvicorn
+
     ENV = os.getenv("ENV", "development")
     PORT = int(os.getenv("PORT", 8000))
-    HOST = "localhost" if ENV == "production" else "localhost"
+    HOST = "localhost"
 
-    uvicorn.run(
-        app="main:app",
-        host="localhost",
-        port=PORT,
-        reload=True if ENV == "development" else False,
-        proxy_headers=True
-    )
+    run_kwargs = {
+        "app": "main:app",
+        "host": HOST,
+        "port": PORT,
+        "reload": ENV == "development",
+        "proxy_headers": True,
+    }
+
+    # Only add uvloop/httptools on non-Windows systems
+    if platform.system() != "Windows":
+        run_kwargs.update({
+            "loop": "uvloop",
+            "http": "httptools"
+        })
+
+    uvicorn.run(**run_kwargs)

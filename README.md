@@ -35,14 +35,13 @@ Users with download access receive a ZIP file like this:
 
 ```
 yoruba_dataset.zip
-├── metadata.xlsx         # Metadata for each audio file
+├── metadata.xlsx         # Metadata for each audio
 ├── README.txt            # Licensing and usage guide
 └── audio/
     ├── 0001_sample.wav
     ├── 0002_sample.wav
     └── ...
 ```
-
 ---
 
 ## 📁 Project Folder Structure
