@@ -83,9 +83,6 @@ def generate_obs_signed_url(language: str, category: str, filename: str, storage
     access_key = settings.OBS_ACCESS_KEY_ID
     secret_key = settings.OBS_SECRET_ACCESS_KEY
 
-    
-    from src.tasks.export_worker import map_category_to_folder
-
     print(f"This is the category and the language from generate_obs_signed_url: {category}, {language}\n\n\n")
 
     folder = map_category_to_folder(language, category)
@@ -110,6 +107,36 @@ def generate_obs_signed_url(language: str, category: str, filename: str, storage
     url = f"https://{bucket}.obsv3.cn-global-1.gbbcloud.com:443/{key}?AccessKeyId={access_key}&Expires={expires}&Signature={signature_enc}"
     
     return url
+
+
+
+
+
+def map_category_to_folder(language: str, category: Optional[str] = None) -> str:
+    """
+    Maps a given category and language to the corresponding folder name.
+
+    Args:
+        category (str): The recording category (e.g., 'spontaneous', 'read').
+        language (str): The language of the recording (e.g., 'yoruba', 'english').
+
+    Returns:
+        str: The folder name to use for S3 storage.
+    """
+
+    language = language.lower()
+    category = (category or "spontaneous").lower()
+
+    # For both Language and Category
+    if category == "spontaneous":
+        if language in ["yoruba", "naija", "hausa"]:
+            return "read-as-spontaneous"
+    elif category == "read" and language in ["yoruba"]:
+        return "read-as-spontaneous"
+    elif category == "read":
+        return "read"
+    
+    return category
 
 
 

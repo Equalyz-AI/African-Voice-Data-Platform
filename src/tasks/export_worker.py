@@ -3,7 +3,7 @@ import logging
 from math import log
 from zipstream import ZipStream, ZIP_DEFLATED
 import asyncio
-from typing import Iterable, Optional
+from typing import Iterable
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 from botocore.exceptions import BotoCoreError
 from botocore.exceptions import ResponseStreamingError
@@ -12,7 +12,7 @@ from src.core.celery_app import celery_app
 from src.db.db import get_async_session_maker
 from src.db.models import DownloadStatusEnum
 from src.crud.crud_export import get_export_job, update_export_job_status
-from src.download.s3_config import  s3_obs, s3_aws
+from src.download.s3_config import  s3_obs, s3_aws, map_category_to_folder
 from src.config import settings
 
 
@@ -25,15 +25,6 @@ MIN_PART_SIZE = 5 * 1024 * 1024
 SAMPLE_RATE = 48000
 CHANNELS = 1
 BYTES_PER_SAMPLE = 2
-
-# import asyncio
-# try:
-#     import nest_asyncio
-#     if not isinstance(asyncio.get_event_loop(), type(asyncio.new_event_loop())):
-#         nest_asyncio.apply()
-# except Exception as e:
-#     print(f"⚠️ nest_asyncio skipped: {e}")
-
 
 
 @retry(
@@ -166,7 +157,7 @@ def create_dataset_zip_s3_task_new(
             )
         )
     except Exception as e:
-        logger.exception(f"❌ Job {job_id} failed: {e}")
+        logger.exception(f"Job {job_id} failed: {e}")
         raise e
     finally:
         loop.close()
@@ -186,7 +177,7 @@ async def async_create_dataset_zip_s3_impl(
     fresh_session_maker=None
     ):
     """Main async implementation."""
-    logger.info(f"🚀 Starting export job {job_id}")
+    logger.info(f"Starting export job {job_id}")
     
     session_maker = fresh_session_maker() if fresh_session_maker else get_async_session_maker()
 
@@ -235,10 +226,7 @@ async def async_create_dataset_zip_s3_impl(
                         error_message="No audio samples found for the selected criteria.",
                         progress_pct=0
                     )
-                # task.update_state(
-                #     state='FAILURE',
-                #     meta={'error': "No audio samples found for the selected criteria."}
-                # )
+
                 return {
                     'job_id': job_id, 
                     'download_url': None, 
@@ -259,30 +247,6 @@ async def async_create_dataset_zip_s3_impl(
                 folder = map_category_to_folder(sample.language, sample.category)
                 key = f"{sample.language.lower()}-test/{folder}/{sample.sentence_id}.wav"
                 
-                # try:
-                #     # obj = s3_obs.get_object(Bucket=settings.OBS_BUCKET_NAME, Key=key)
-                #     s3_stream_generator = await asyncio.to_thread(
-                #         get_s3_stream_for_file_with_retry, 
-                #         settings.OBS_BUCKET_NAME, 
-                #         key
-                #     )
-                    
-                #     try:
-                #         zs.add(s3_stream_generator, arcname=arcname)
-                    
-                #     except ResponseStreamingError as stream_e:
-                #         raise stream_e  # Re-raise to be caught by the outer block if possible, 
-                #                     # or handle retry logic here if applicable. 
-                #                     # For now, let's just log and skip:
-
-                #         logger.warning(f"S3 STREAMING ERROR for {key}: {stream_e}. Skipping file.")
-                #         continue
-
-                # except Exception as e:
-                #     logger.warning(f"Skipping missing audio for job {job_id}: {key} - {e}")
-                #     continue
-
-                
                 try:
                     file_bytes = await asyncio.to_thread(download_s3_bytes, settings.OBS_BUCKET_NAME, key)
                     zs.add(iter([file_bytes]), arcname=arcname)
@@ -300,19 +264,9 @@ async def async_create_dataset_zip_s3_impl(
                 processed_count += 1
                 
                 # Update progress every 10 samples
-                if processed_count % 5 == 0:
+                if processed_count % 3 == 0:
                     progress = int((processed_count / total_to_process) * 95)
-                    
-                    # Update both Celery state AND database
-                    # task.update_state(
-                    #     state='PROGRESS',
-                    #     meta={
-                    #         'current': processed_count,
-                    #         'total': total_to_process,
-                    #         'status': f'Processing {processed_count}/{total_to_process}',
-                    #         'job_id': job_id
-                    #     }
-                    # )
+            
                     
                     async with session_maker() as progress_session:
                         await update_export_job_status(
@@ -339,12 +293,6 @@ async def async_create_dataset_zip_s3_impl(
             )
 
         # Generate presigned URL
-        # download_url = s3_aws.generate_presigned_url(
-        #     'get_object',
-        #     Params={'Bucket': settings.S3_BUCKET_NAME, 'Key': export_filename},
-        #     ExpiresIn=86400
-        # )
-
         download_url = await asyncio.to_thread(
             s3_aws.generate_presigned_url,
             'get_object',
@@ -357,8 +305,7 @@ async def async_create_dataset_zip_s3_impl(
                 session, job_id, DownloadStatusEnum.READY, 
                 download_url=download_url, progress_pct=100
             )
-
-        logger.info(f"✅ Job {job_id} completed: {download_url}")
+        logger.info(f"\n\nGREAT!.==========\n\nExport Job {job_id} completed: {download_url}\n\n")
         return {
             'job_id': job_id, 
             'download_url': download_url, 
@@ -366,42 +313,10 @@ async def async_create_dataset_zip_s3_impl(
         }
 
     except Exception as e:
-        logger.exception(f"❌ Job {job_id} failed: {e}")
+        logger.exception(f"Job {job_id} failed: {e}")
         async with session_maker() as session:
             await update_export_job_status(
                 session, job_id, DownloadStatusEnum.FAILED, 
                 error_message=str(e), progress_pct=0
             )
-        # task.update_state(state='FAILURE', meta={'error': str(e)})
         raise
-
-
-
-
-
-def map_category_to_folder(language: str, category: Optional[str] = None) -> str:
-    """
-    Maps a given category and language to the corresponding folder name.
-
-    Args:
-        category (str): The recording category (e.g., 'spontaneous', 'read').
-        language (str): The language of the recording (e.g., 'yoruba', 'english').
-
-    Returns:
-        str: The folder name to use for S3 storage.
-    """
-
-    language = language.lower()
-    category = (category or "spontaneous").lower()
-
-    # For both Language and Category
-    if category == "spontaneous":
-        if language in ["yoruba", "naija", "hausa"]:
-            return "read-as-spontaneous"
-    elif category == "read" and language in ["yoruba"]:
-        return "read-as-spontaneous"
-    elif category == "read":
-        return "read"
-    
-    return category
-

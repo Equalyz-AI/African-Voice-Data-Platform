@@ -59,7 +59,7 @@ def get_async_engine():
                 },
             },
         )
-        logger.info("✅ Async engine created")
+        logger.info("Async engine created")
     return _async_engine
 
 
@@ -115,7 +115,7 @@ def get_async_session_maker(force_new: bool = False) -> async_sessionmaker[Async
             expire_on_commit=False,
             autoflush=False,
         )
-        logger.info("✅ Async session maker created")
+        logger.info("Async session maker created")
 
     return _async_session_maker
 
@@ -136,9 +136,9 @@ async def create_tables():
         engine = get_async_engine()
         async with engine.begin() as conn:
             await conn.run_sync(SQLModel.metadata.create_all)
-        logger.info("✅ Database tables created/verified")
+        logger.info("Database tables created/verified")
     except Exception as e:
-        logger.error(f"❌ Failed to create tables: {e}")
+        logger.error(f"Failed to create tables: {e}")
         raise
 
 async def dispose_async_engine():
@@ -147,7 +147,7 @@ async def dispose_async_engine():
     if _async_engine is not None:
         await _async_engine.dispose()
         _async_engine = None
-        logger.info("✅ Async engine disposed")
+        logger.info("Async engine disposed")
 
 
 # ============================================
@@ -173,7 +173,7 @@ def get_sync_engine():
             max_overflow=10,
             pool_recycle=900,
         )
-        logger.info("✅ Sync engine created")
+        logger.info("Sync engine created")
     return _sync_engine
 
 def get_sync_session_maker():
@@ -199,4 +199,4 @@ def dispose_sync_engine():
     if _sync_engine is not None:
         _sync_engine.dispose()
         _sync_engine = None
-        logger.info("✅ Sync engine disposed")
+        logger.info("Sync engine disposed")
