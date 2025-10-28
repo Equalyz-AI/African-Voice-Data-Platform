@@ -13,3 +13,6 @@ for root, _, files in os.walk(local_directory):
         s3_key = os.path.join(s3_prefix, os.path.relpath(local_path, local_directory)).replace('\\', '/')
         s3.upload_file(local_path, bucket_name, s3_key)
         print(f"Uploaded {local_path} to s3://{bucket_name}/{s3_key}")
+
+
+

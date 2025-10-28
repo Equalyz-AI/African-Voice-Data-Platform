@@ -102,7 +102,10 @@ class UserService:
         return user
 
     async def authenticate_user(
-        self, email: str, password: str, session: AsyncSession
+        self, 
+        email: str, 
+        password: Optional[str], 
+        session: AsyncSession
     ) -> User:
         """Authenticate a user by email and password."""
         user = await self.get_user_by_email(email, session)
@@ -233,7 +236,7 @@ class UserService:
                 user.verification_token = verification_token
                 session.add(user)
                 await session.commit()
-                send_verification_email(user.email, verification_token)
+                send_verification_email(user.email, user.full_name, verification_token)
 
             return VerificationMailSchemaResponse(
                 status=True,

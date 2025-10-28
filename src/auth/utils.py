@@ -7,10 +7,10 @@ import jwt, logging
 from passlib.context import CryptContext
 from src.config import settings
 from src.errors import InvalidCredentials, InvalidToken, UnAuthenticated, UserNotFound
-from fastapi import Request,  HTTPException
+from fastapi import Request
 import secrets
 from fastapi.security import OAuth2PasswordBearer
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends
 from src.config import settings
 from fastapi.encoders import jsonable_encoder
 from .schemas import LoginResponseModel, TokenUser

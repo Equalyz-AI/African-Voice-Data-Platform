@@ -1,4 +1,4 @@
-from sqlmodel import Field, SQLModel, Column, Relationship, CheckConstraint
+from sqlmodel import Field, SQLModel, Column, Relationship, CheckConstraint, String, DateTime
 from typing import List, Optional
 from datetime import datetime, timezone
 import sqlalchemy.dialects.postgresql  as pg
@@ -7,16 +7,42 @@ from sqlalchemy.sql import func
 import uuid
 from enum import Enum
 from sqlalchemy import JSON
+from typing import Optional
+
+class Optio(str, Enum):
+    passed = "passed"
+    failed = "failed"
+    pending = "pending"
+
+
+class Split(str, Enum):
+    train = "train"
+    dev = "dev"
+    dev_test = "dev_test"
+
+
+class DownloadStatusEnum(str):
+    QUEUED = "queued"
+    PROCESSING = "processing"
+    READY = "ready"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
 
 
 class RoleEnum(str, Enum):
     user = "user"
     admin = "admin"
 
-class Categroy(str, Enum):
+class Category(str, Enum):
     read = "read"
     spontaneous = "spontaneous"
-    read_as_spontaneous = "read_as_spontaneous"
+    read_with_spontaneous = "read_with_spontaneous"
+
+class GenderEnum(str, Enum):
+    male = "male"
+    female = "female"
 
 
 class User(SQLModel, table=True):
@@ -41,13 +67,11 @@ class User(SQLModel, table=True):
     feedback: List["Feedback"] = Relationship(back_populates="user")
 
 
-
 class AudioSample(SQLModel, table=True):
     __table_args__ = (
         CheckConstraint("snr >= 0", name="check_snr_non_negative"),
         CheckConstraint("gender IN ('male','female')", name="check_valid_gender"),
     )
-
     id: str = Field(
         sa_column=Column(
             pg.VARCHAR,
@@ -56,27 +80,29 @@ class AudioSample(SQLModel, table=True):
             default=lambda: str(uuid.uuid4())
         )
     )
-    dataset_id: str = Field(foreign_key="dataset.id")
-    category: str = Field(sa_column=Column(pg.VARCHAR, default=Categroy.read))
-    audio_path: str
-    duration: float
-    transcript: Optional[str] = None
-    speaker_id: Optional[str] = None
-    transcript_id: Optional[str] = None
-    language: str = Field(default="pidgin")
-    sample_rate: int = Field(default=80000)
-    snr: float = Field(default=40.0)
-    approval: str = Field(default="approved")
-    gender: str = Field(default="male")
-    age: Optional[int] = Field(default=25)
-    education: Optional[str] = Field(default=None)
-    domain: Optional[str] = Field(default="Finance")
 
-    uploaded_at: datetime = Field(default_factory=datetime.utcnow)
+    dataset_id: Optional[str] = Field(foreign_key="dataset.id", nullable=True, default="naija")
+
+    sentence_id: Optional[str] = Field(default=None)
+    sentence: Optional[str] = Field(default=None)
+    storage_link: Optional[str] = Field(default=None)
+    gender: Optional[str] =  Field(sa_column=Column(pg.VARCHAR, default=None))
+
+    source: Optional[str] =  Field(sa_column=Column(pg.VARCHAR, default=None))
+    speaker_id: Optional[str] =  Field(sa_column=Column(pg.VARCHAR, default=None))
+    split: Optional[Split] =  Field(sa_column=Column(pg.VARCHAR, default=Split.train))
+
+    age_group: Optional[str] =  Field(sa_column=Column(pg.VARCHAR, default=None, nullable=True))
+    edu_level: Optional[str] =  Field(sa_column=Column(pg.VARCHAR, default=None, nullable=True))
+    duration: Optional[str] =  Field(sa_column=Column(pg.VARCHAR, default=None, nullable=True))
+
+    language: Optional[str] =  Field(sa_column=Column(pg.VARCHAR, default='naija'))
+    snr:  Optional[int] = Field(sa_column=Column(pg.INTEGER, default=40))
+
+    domain: Optional[str] =  Field(sa_column=Column(pg.VARCHAR, default=None))
+    category: str = Field(sa_column=Column(pg.VARCHAR, default=Category.read))
     created_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, default=datetime.now))
-
-
-
+    uploaded_at: datetime = Field(default_factory=datetime.utcnow)
 
 
 
@@ -104,7 +130,7 @@ class QAMetadata(SQLModel, table=True):
         )
     )
     audio_id: str = Field(foreign_key="audiosample.id", unique=True)
-    qa_status: str  # 'passed', 'failed', 'pending'
+    qa_status: Optional[Optio] = Field(default=Optio.pending)
     duration_check: bool
     noise_level: str
     label_match: bool
@@ -129,18 +155,50 @@ class Dataset(SQLModel, table=True):
 
 
 class DownloadLog(SQLModel, table=True):
+    __tablename__ = "download_logs"
+
+    # Unique request ID
     id: str = Field(
-        sa_column=Column(
-            pg.VARCHAR,
-            nullable=False,
-            primary_key=True,
-            default= lambda: str(uuid.uuid4())
-        )
+        default_factory=lambda: str(uuid.uuid4()), 
+        primary_key=True, 
+        index=True
     )
-    user_id: str = Field(foreign_key="users.id")
-    dataset_id: str = Field(foreign_key="dataset.id")
-    percentage: int  # from {5,20,40,60,80,100}
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+
+    # User who triggered the download
+    user_id: str = Field(index=True)
+
+    # Dataset reference (if applicable)
+    dataset_id: Optional[str] = Field(default=None, index=True)
+
+    # Percentage requested
+    percentage: float = Field()
+
+    # Status of the job
+    status: str = Field(
+        default=DownloadStatusEnum.PROCESSING, 
+        sa_column=Column(String, index=True)
+    )
+
+    language: Optional[str] = Field(default=None)
+
+    # Presigned S3 download link (set when job is ready)
+    download_url: Optional[str] = Field(default=None)
+
+    # Optional error message if job fails
+    error_message: Optional[str] = Field(default=None)
+    progress_pct: Optional[int] = Field(default=None)
+
+    # Created and updated timestamps
+    created_at: Optional[str] = Field(
+        sa_column=Column(DateTime(timezone=True), server_default=func.now())
+    )
+    updated_at: Optional[str] = Field(
+        sa_column=Column(DateTime(timezone=True), onupdate=func.now())
+    )
+
+
+
+
 
 
 # User feedback. The feedback should be a list
