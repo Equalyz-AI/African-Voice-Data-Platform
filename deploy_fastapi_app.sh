@@ -2,7 +2,7 @@
 
 set -e
 
-# Automatically detect project directory and name
+
 APP_DIR=$(pwd)
 APP_NAME=$(basename "$APP_DIR")
 ENV_FILE="$APP_DIR/.env"

@@ -7,12 +7,15 @@ samples/
 __pycache__/
 
 temp_files/
+.env_copy
 
 google_upload_to_db.py
 drive_client.py
 account.json
 push_to_db_local_sheets.py
 
+
+ai4gov2.pem
 insert_dataset.sql
 
 neon_clean_dump.sql
