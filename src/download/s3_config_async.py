@@ -1,8 +1,10 @@
 import aiobotocore.session
 from functools import partial
+from aiohttp.client import ClientTimeout
 from botocore.config import Config
 from typing import Optional
 
+DOWNLOAD_TIMEOUT_SECONDS = 300
 
 def get_async_s3_client_factory(settings, is_obs: Optional[bool] = False):
     """
@@ -16,7 +18,12 @@ def get_async_s3_client_factory(settings, is_obs: Optional[bool] = False):
                 await s3.get_object(Bucket=..., Key=...)
     """
 
+    timeout_config = ClientTimeout(total=DOWNLOAD_TIMEOUT_SECONDS)
+
     session = aiobotocore.session.get_session()
+    # session.set_default_client_config(
+    #     client_config=
+    # )
 
     if is_obs:
         aws_access_key_id = settings.OBS_ACCESS_KEY_ID
