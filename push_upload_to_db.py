@@ -11,7 +11,7 @@ from src.db.models import AudioSample, Category, Split
 
 # === CONFIG ===
 DATA_DIR = Path("data")
-BATCH_SIZE = 50          # Safe for most DBs; reduce if needed
+BATCH_SIZE = 50 
 MAX_RETRIES = 3
 RETRY_DELAY = 2  # seconds
 
