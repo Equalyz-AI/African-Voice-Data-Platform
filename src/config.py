@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     OBS_ACCESS_KEY_ID: str
     OBS_SECRET_ACCESS_KEY: str
     OBS_ENDPOINT_URL: str = "https://obsv3.cn-global-1.gbbcloud.com"
-    OBS_REGION: str
+    OBS_REGION: str = "cn-global-1"
     OBS_BUCKET_NAME: str = "dsn"
     
 
