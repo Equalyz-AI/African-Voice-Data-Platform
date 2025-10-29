@@ -44,7 +44,7 @@ google-auth
 google-api-python-client
 pandas
 esdk-obs-python
-
+urllib
 
 tenacity
 
