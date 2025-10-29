@@ -19,11 +19,10 @@ def get_async_s3_client_factory(settings, is_obs: Optional[bool] = False):
     session = aiobotocore.session.get_session()
 
     if is_obs:
-        # OBS-compatible (e.g., Huawei Cloud OBS)
-        aws_access_key_id = getattr(settings, "OBS_ACCESS_KEY_ID", None)
-        aws_secret_access_key = getattr(settings, "OBS_SECRET_ACCESS_KEY", None)
-        endpoint_url = getattr(settings, "OBS_ENDPOINT_URL", "https://obsv3.cn-global-1.gbbcloud.com")
-        region_name = getattr(settings, "OBS_REGION", "cn-global-1")
+        aws_access_key_id = settings.OBS_ACCESS_KEY_ID
+        aws_secret_access_key = settings.OBS_SECRET_ACCESS_KEY
+        endpoint_url = "https://obsv3.cn-global-1.gbbcloud.com"
+        region_name = "cn-global-1"
 
         config_kwargs = getattr(settings, "OBS_CONFIG_KWARGS", {
             "s3": {"addressing_style": "virtual"},

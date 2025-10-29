@@ -30,10 +30,6 @@ from src.db.db import get_async_session_maker
 
 logger = logging.getLogger(__name__)
 
-# --- NEW: Concurrency and Upload Settings ---
-# We no longer need MIN_PART_SIZE for streaming the zip
-# We define how many files to download from S3 at once.
-# Adjust this based on your server's network/CPU. 20-50 is a good range.
 CONCURRENT_DOWNLOADS = 20
 
 
@@ -54,8 +50,7 @@ async def async_get_s3_body_stream_with_retry(async_s3_client: aiobotocore.clien
         async for chunk in stream:
             yield chunk
 
-# --- DELETED: sync_s3_stream_wrapper (No longer needed) ---
-# --- DELETED: async_zip_stream_to_s3_multipart (No longer needed) ---
+
 
 # --- NEW: Helper function to download one file to disk ---
 async def download_sample_to_temp_file(
@@ -294,7 +289,7 @@ async def async_create_dataset_zip_s3_impl(
                 s3_aws.generate_presigned_url,
                 'get_object',
                 Params={'Bucket': settings.S3_BUCKET_NAME, 'Key': export_filename},
-                ExpiresIn=604800 # 7 days
+                ExpiresIn=604800
             )
             
             async with session_maker() as session:
