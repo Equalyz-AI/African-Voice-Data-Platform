@@ -5,14 +5,11 @@ import aiofiles
 import zipfile
 import tempfile
 import shutil
-from typing import AsyncIterable, Iterable, Optional
-from functools import partial
+from typing import AsyncIterable, Optional
 
 # External dependencies
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 from botocore.exceptions import BotoCoreError, ResponseStreamingError
-# We are NO LONGER using zipstream
-# from zipstream import ZIP_STORED, ZipStream, ZIP_DEFLATED
 from aiobotocore.session import get_session
 import aiobotocore.client
 
