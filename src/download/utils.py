@@ -7,13 +7,12 @@ import requests
 import aiohttp
 import asyncio, os, aioboto3
 from fastapi import HTTPException
-from src.db.models import AudioSample, Category
-from src.download.s3_config import  SUPPORTED_LANGUAGES
+from src.db.models import AudioSample
 from src.download.s3_config import s3_aws
 from src.download.s3_config import generate_obs_signed_url, map_sentence_id_to_transcript_obs
 from sqlmodel import select, and_
 from src.config import settings
-from zipstream import ZipStream, ZIP_DEFLATED
+from zipstream.ng import ZipStream, ZIP_DEFLATED
 
 s3 = s3_aws
 

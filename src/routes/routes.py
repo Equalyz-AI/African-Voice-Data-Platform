@@ -7,7 +7,7 @@ from src.auth.utils import get_current_user
 from src.auth.schemas import TokenUser
 from src.download.service import DownloadService
 from src.download.schemas import AudioPreviewResponse, EstimatedSizeResponse
-from src.db.models import  Category, GenderEnum
+from src.db.models import  Category, GenderEnum, Split
 from typing import Optional
 from src.config import settings
 
@@ -133,49 +133,26 @@ async def estimate_zip_size(
 
 
 
-# , response_class=StreamingResponse
 @download_router.get("/zip/{language}/{pct}", response_model=dict)
 async def download_zip(
     language: str,
-    background_tasks: BackgroundTasks,
     pct: int | float,
-    
-    gender: str | None = Query(None),
-    age: str | None = Query(None),
-    education: str | None = Query(None),
-    domain: str | None = Query(None),
-    category: str | None = Query(None),
-    split: str | None = Query(None),
-    
+    split: Split | None = Query(default=Split.train, description="Split type: train, dev, or dev_test"),
     as_excel: bool = True,
     current_user: TokenUser = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ):
+    """Download pre-zipped data batches for a specific language and split."""
 
-    gender = map_all_to_none(value=gender)
-    age = map_all_to_none(value=age)
-    education = map_all_to_none(value=education)
-    domain = map_EV_to_EV(domain, language)
-    category = map_all_to_none(category, language)
+    # enforce the only allowed pct
+    if pct != 100:
+        return {"error": "Only 100% zips are available."}
 
-    gender = GenderEnum(gender) if gender else None
-    category = Category(category) if category else None
     language = language.lower()
 
-    print("This is the category after the mapping: ", category, language)
-
-    return await download_service.download_zip_with_metadata_s3(
-        language=language, 
-        pct=pct, 
-        session=session, 
-        background_tasks=background_tasks, 
-        current_user=current_user, 
-        as_excel=as_excel,
-        gender=gender, 
-        age_group=age, 
-        education=education, 
-        split=split,
-        domain=domain, 
-        category=category
+    return await download_service.download_zip_with_from_s3(
+        language=language,
+        pct=pct,
+        session=session,
+        split=split.value if split else None,
     )
-
