@@ -42,16 +42,7 @@ logger.addHandler(file_handler)
 # --------------------------------------------------
 
 allowed_origins = [
-    "http://localhost:3000",
-    "https://ai4governance.onrender.com",
-    "https://accounts.google.com",
-    "https://ai-for-governance.vercel.app",
-    "https://www.genaigov.ai",
-    "https://genaigov.ai",
-    "https://api.genaigov.ai",
-    "https://africanvoices.io",
-    "https://www.africanvoices.io",
-    "https://main.d1wrs85izeeycs.amplifyapp.com",
+    "*"
 ]
 
 
@@ -153,18 +144,21 @@ def register_middleware(app: FastAPI):
     app.add_middleware(
         TrustedHostMiddleware,
         allowed_hosts=[
-            "localhost",
-            "127.0.0.1",
-            "0.0.0.0",
-            "ai4governance.onrender.com",
-            "*.onrender.com",
-            "51.20.123.49",
-            "ec2-51.20.123.49.eu-north-1.compute.amazonaws.com",
-            "51-20-193-205",
-            "ec2-51-20-193-205.eu-north-1.compute.amazonaws.com",
-            "api.africanvoices.io",
-            "africanvoices.io", 
-            "www.africanvoices.io",
-            "main.d1wrs85izeeycs.amplifyapp.com",
+        "localhost",
+        "127.0.0.1",
+        "0.0.0.0",
+        "13.51.31.226",
+        "ec2-13-51-31-226.eu-north-1.compute.amazonaws.com",
+        "ai4governance.onrender.com",
+        "*.onrender.com",
+        "51.20.123.49",
+        "ec2-51-20-123-49.eu-north-1.compute.amazonaws.com",
+        "51-20-193-205",
+        "ec2-51-20-193-205.eu-north-1.compute.amazonaws.com",
+        "api.africanvoices.io",
+        "africanvoices.io",
+        "www.africanvoices.io",
+        "main.d1wrs85izeeycs.amplifyapp.com",
+        "*",
         ],
     )
