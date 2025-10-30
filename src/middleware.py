@@ -42,7 +42,10 @@ logger.addHandler(file_handler)
 # --------------------------------------------------
 
 allowed_origins = [
-    "*"
+    "http://localhost:3000",
+    "https://africanvoices.io",
+    "https://www.africanvoices.io",
+    "https://main.d1wrs85izeeycs.amplifyapp.com",
 ]
 
 
@@ -160,5 +163,5 @@ def register_middleware(app: FastAPI):
         "www.africanvoices.io",
         "main.d1wrs85izeeycs.amplifyapp.com",
         "*",
-        ],
+    ],
     )
