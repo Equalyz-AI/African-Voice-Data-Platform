@@ -36,11 +36,8 @@ TRACKING_FILE = "processed_files.csv"
 async def download_sample_to_temp_file(sample, temp_dir_path, semaphore):
     """Download a single file efficiently."""
     # Ensure the sentence_id ends with .wav
-    filename = sample.sentence_id.strip()
-    # ensure only one .wav extension
-    if filename.lower().endswith(".wav.wav"):
-        filename = filename[:-4]  # remove the extra .wav
-    elif not filename.lower().endswith(".wav"):
+    filename = sample.sentence_id
+    if not filename.lower().endswith(".wav"):
         filename += ".wav"
 
     arcname = f"audio/{filename}"
@@ -49,8 +46,7 @@ async def download_sample_to_temp_file(sample, temp_dir_path, semaphore):
     if os.path.exists(local_file_path):
         logger.debug(f"File exists, skipping: {sample.sentence_id}")
         return local_file_path, arcname, sample
-
-    
+        
 
     url = generate_obs_signed_url(
         language=sample.language.lower(),
