@@ -48,7 +48,6 @@ googleapis-common-protos==1.70.0
 greenlet==3.2.3
 gspread==6.2.1
 h11==0.16.0
-urllib
 httpcore==1.0.9
 httplib2==0.22.0
 httptools==0.6.4

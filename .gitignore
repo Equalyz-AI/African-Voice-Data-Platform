@@ -5,9 +5,12 @@ MYREADME.md
 
 samples/
 __pycache__/
-
+data_old/
 temp_files/
 .env_copy
+
+
+convert_tsv_to_excel.py
 
 google_upload_to_db.py
 drive_client.py

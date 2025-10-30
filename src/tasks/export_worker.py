@@ -1,7 +1,7 @@
 
 import logging
 from math import log
-from zipstream import ZipStream, ZIP_DEFLATED
+from zipstream.ng import ZipStream, ZIP_DEFLATED
 import asyncio
 from typing import Iterable
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type

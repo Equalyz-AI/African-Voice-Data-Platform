@@ -8,6 +8,7 @@ import math
 from botocore.exceptions import NoCredentialsError
 from sqlalchemy import select, and_, func
 from sqlalchemy.ext.asyncio import AsyncScalarResult
+import logging
 
 from src.db.models import AudioSample, DownloadLog, GenderEnum
 from src.auth.schemas import TokenUser
@@ -24,6 +25,8 @@ from src.download.utils import (
     stream_zip_to_s3,
 )
 import aioboto3
+
+logger = logging.getLogger(__name__)
 
 
 AUDIO_SAMPLE_RATE = 48000  # Hz
@@ -341,3 +344,56 @@ class DownloadService:
             samples=samples,
             as_excel=as_excel
         )
+        
+
+    async def download_zip_with_from_s3(
+        self,
+        language: str,
+        pct: float,
+        session,
+        split: Optional[str] = None,
+    ):
+        """
+        Returns a list of signed S3 URLs for zip batches matching the pattern:
+        exports/{language}_{split}_{pct}%_batch[i].zip
+        """
+
+        prefix = f"exports/{language}_{split}_{pct}%_batch"
+        logger.info(f"Listing zips from bucket={self.s3_bucket_name}, prefix={prefix}")
+
+        try:
+            resp = s3_aws.list_objects_v2(Bucket=self.s3_bucket_name, Prefix=prefix)
+            files = resp.get("Contents", [])
+            if not files:
+                return {"message": f"No zip files found for {language}-{split}-{pct}%"}
+
+            results = []
+            for obj in files:
+                key = obj["Key"]
+                if key.endswith(".zip"):
+                    signed_url = s3_aws.generate_presigned_url(
+                        "get_object",
+                        Params={"Bucket": self.s3_bucket_name, "Key": key},
+                        ExpiresIn=3600 * 6,  # 6 hours expiry
+                    )
+                    results.append({
+                        "key": key,
+                        "size_mb": round(obj["Size"] / (1024 * 1024), 2),
+                        "last_modified": obj["LastModified"].isoformat(),
+                        "download_url": signed_url,
+                    })
+
+            # Sort by batch number
+            results.sort(key=lambda x: int(x["key"].split("batch[")[-1].split("]")[0]))
+
+            return {
+                "language": language,
+                "split": split,
+                "pct": pct,
+                "total_batches": len(results),
+                "batches": results,
+            }
+
+        except Exception as e:
+            logger.error(f"Failed to list or sign zips: {e}", exc_info=True)
+            return {"error": str(e)}
