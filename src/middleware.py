@@ -164,6 +164,5 @@ def register_middleware(app: FastAPI):
         "www.africanvoices.io",
         "main.d1wrs85izeeycs.amplifyapp.com",
         "temp.d1yjz67kk47683.amplifyapp.com"
-        "*",
     ],
     )
