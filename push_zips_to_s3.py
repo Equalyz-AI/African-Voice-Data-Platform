@@ -1,7 +1,7 @@
 import logging
 import asyncio
 import aiofiles
-import os
+import os, re
 import tempfile
 import zipfile
 import csv
@@ -15,6 +15,28 @@ from src.download.s3_config import generate_obs_signed_url
 from src.download.s3_config_async import get_async_s3_client_factory
 from src.config import settings
 from src.download.utils import generate_readme
+
+
+def normalize_wav_filename(raw_name: str) -> str:
+    """
+    Normalize filename to ensure:
+    - No prefixes like 'record', 'recorder', 'mic', etc. interfere
+    - Ends with exactly one .wav
+    - Safe lowercase handling
+    """
+    name = raw_name.strip()
+
+    # Remove all leading prefixes that look like "record", "recorder", "recorder45-", etc.
+    name = re.sub(r'^(record(er)?\d*-?)', '', name, flags=re.IGNORECASE)
+
+    # Remove all trailing .wav (in case of double or triple)
+    while name.lower().endswith(".wav"):
+        name = name[:-4]
+
+    # Add back exactly one .wav
+    name = f"{name}.wav"
+
+    return name
 
 
 # ----------------------------- CONFIG -----------------------------
@@ -34,39 +56,58 @@ TRACKING_FILE = "processed_files.csv"
 
 # ----------------------------- UTILS -----------------------------
 async def download_sample_to_temp_file(sample, temp_dir_path, semaphore):
-    """Download a single file efficiently."""
-    # Ensure the sentence_id ends with .wav
-    filename = sample.sentence_id
-    if not filename.lower().endswith(".wav"):
-        filename += ".wav"
+    """Download one file, handling .wav issues and recorder-prefixed names."""
+    filename = normalize_wav_filename(sample.sentence_id)
 
     arcname = f"audio/{filename}"
     local_file_path = os.path.join(temp_dir_path, filename)
 
     if os.path.exists(local_file_path):
-        logger.debug(f"File exists, skipping: {sample.sentence_id}")
+        logger.debug(f"Already exists: {filename}")
         return local_file_path, arcname, sample
-        
 
-    url = generate_obs_signed_url(
-        language=sample.language.lower(),
-        category=sample.category,
-        filename=filename,
-    )
+    async def try_download(fname):
+        url = generate_obs_signed_url(
+            language=sample.language.lower(),
+            category=sample.category,
+            filename=fname,
+        )
+        timeout = aiohttp.ClientTimeout(total=600)
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            async with session.get(url) as response:
+                if response.status == 404:
+                    return False
+                response.raise_for_status()
+                async with aiofiles.open(local_file_path, "wb") as f:
+                    async for chunk in response.content.iter_chunked(8192):
+                        await f.write(chunk)
+        return True
 
     async with semaphore:
         try:
-            timeout_config = aiohttp.ClientTimeout(total=DOWNLOAD_TIMEOUT_SECONDS)
-            async with aiohttp.ClientSession(timeout=timeout_config) as session:
-                async with session.get(url) as response:
-                    response.raise_for_status()
-                    async with aiofiles.open(local_file_path, "wb") as f:
-                        async for chunk in response.content.iter_chunked(CHUNK_SIZE_BYTES):
-                            await f.write(chunk)
+            ok = await try_download(filename)
+
+            # If not found, try recorderXX- prefixed versions
+            if not ok:
+                # Try recorder1–99 prefixes
+                for i in range(1, 100):
+                    alt = f"recorder{i}-{filename}"
+                    ok = await try_download(alt)
+                    if ok:
+                        logger.info(f"Recovered with prefix: {alt}")
+                        break
+
+            if not ok:
+                logger.warning(f"❌ Not found even after prefix attempts: {filename}")
+                return None
+
             return local_file_path, arcname, sample
+
         except Exception as e:
-            logger.warning(f"Failed download {sample.sentence_id}: {e}")
+            logger.warning(f"⚠️ Error downloading {filename}: {e}")
             return None
+
+
 
 def create_zip_file(zip_path, files, metadata_path, readme_path):
     """Create ZIP file on disk without loading all files in memory."""
