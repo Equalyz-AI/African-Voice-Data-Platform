@@ -13,6 +13,9 @@ data*
 
 hausa_yoruba_ife/
 
+yoruba_ife/
+yoruba_seun/
+
 convert_tsv_to_excel.py
 
 google_upload_to_db.py
