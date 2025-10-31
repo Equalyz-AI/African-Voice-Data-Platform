@@ -9,6 +9,9 @@ data_old/
 temp_files/
 .env_copy
 
+data*
+
+hausa_yoruba_ife/
 
 convert_tsv_to_excel.py
 
