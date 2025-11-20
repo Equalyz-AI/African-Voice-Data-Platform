@@ -16,7 +16,6 @@ from src.download.s3_config_async import get_async_s3_client_factory
 from src.config import settings
 from src.download.utils import generate_readme
 
-
 def normalize_wav_filename(raw_name: str) -> str:
     """
     Normalize filename to ensure:

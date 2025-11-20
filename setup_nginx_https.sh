@@ -18,7 +18,7 @@ echo "Expected A Records:"
 echo "@    -> $IP"
 echo "www  -> $IP"
 
-# Check root domain
+# Check root domainb
 echo "🔍 Checking DNS for $DOMAIN..."
 RESULT=$(nslookup $DOMAIN | grep 'Address:' | tail -n1 | awk '{print $2}')
 if [ "$RESULT" != "$IP" ]; then
