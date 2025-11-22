@@ -70,7 +70,6 @@ def load_excel_records(file_path: Path) -> List[AudioSample]:
                 storage_link=str(row.get("audio_path") or "").strip(),
                 speaker_id=str(row.get("speaker_id") or "").strip(),
                 gender=str(row.get("gender") or "").strip().lower(),
-                speaker_id=str(row.get("speaker_id") or "").strip(),
                 split=str(row.get("split") or "").strip(),
                 age_group=str(row.get("age_group") or "").strip(),
                 edu_level=str(row.get("education") or "").strip(),
