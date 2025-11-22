@@ -59,12 +59,9 @@ def load_excel_records(file_path: Path) -> List[AudioSample]:
     records = []
     for _, row in df.iterrows():
         sentence_id = str(row.get("audio_id") or "").strip()
-        split = str(row.get("split") or "").strip().lower()
         if not sentence_id:
+            print(f"This row will be skipped because it has no audio ID: {sentence_id}")
             continue  # Skip rows without unique 
-        if split == "test":
-            print(f"This row has a {split} value and will therefore be skipped!")
-            continue
 
         records.append(
             AudioSample(
