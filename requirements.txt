@@ -57,6 +57,7 @@ zipstream-new
 nest-asyncio
 clear
 nest_asyncio
+azure-storage-blob 
 
 
 
