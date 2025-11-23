@@ -1,10 +1,8 @@
 import boto3
 from dotenv import load_dotenv
 from botocore.client import Config
-from src import config
 from src.config import settings
 from typing import Optional
-from urllib.parse import urlparse
 import hmac, hashlib, base64, time, urllib.parse
 
 load_dotenv()
@@ -53,19 +51,6 @@ VALID_CATEGORIES = {"read", "spontaneous", "read_with_spontaneous"}
 
 
 
-def create_presigned_url(audio_path: str, expiration: int = 3600, bucket: str = BUCKET_OBS) -> str:
-    try:
-        response = s3_obs.generate_presigned_url(
-            "get_object",
-            Params={"Bucket": bucket, "Key": audio_path},
-            ExpiresIn=expiration
-        )
-        return response
-    except Exception as e:
-        raise Exception(f"Failed to generate URL: {e}")
-
-
-
 def generate_obs_signed_url(language: str, category: str, filename: str, storage_link: Optional[str] = None, expiration: int = 3600) -> str:
     """
     Generate a signed OBS URL for a specific file.
@@ -86,7 +71,7 @@ def generate_obs_signed_url(language: str, category: str, filename: str, storage
     print(f"This is the category and the language from generate_obs_signed_url: {category}, {language}\n\n\n")
 
     folder = map_category_to_folder(language, category)
-    key = f"{language}-test/{folder}/{filename}"
+    key = f"{language}/{folder}/{filename}"
 
     # Expiry timestamp (Unix time)
     expires = int(time.time()) + expiration
@@ -132,9 +117,10 @@ def map_category_to_folder(language: str, category: Optional[str] = None) -> str
         return "spontaneous/audio"
     if category == "spontaneous" and language == "hausa":
         return "spontaneous"
-    if category == "spontaneous":
-        if language in ["yoruba", "naija"]:
-            return "read-as-spontaneous"
+    if category == "spontaneous" and language == "yoruba":
+        return "spontaneous"
+    if category == "spontaneous" and language == "naija":
+        return "read-as-spontaneous"
     elif category == "read" and language in ["yoruba"]:
         return "read-as-spontaneous"
     elif category == "read":

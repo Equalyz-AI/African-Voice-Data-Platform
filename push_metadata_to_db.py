@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import List
 
 import pandas as pd
-from sqlmodel import select, insert
+from sqlmodel import select
 from src.db.db import get_async_session_maker
 from src.db.models import AudioSample, Category, Split
 

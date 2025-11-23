@@ -10,7 +10,9 @@ from tqdm.asyncio import tqdm
 import aiohttp
 from botocore.exceptions import BotoCoreError, ClientError
 
+from src.core.main_one_config import container_client
 from src.db.db import get_async_session_maker
+from src.download.main_one import upload_to_azure
 from src.download.s3_config import generate_obs_signed_url
 from src.download.s3_config_async import get_async_s3_client_factory
 from src.config import settings
@@ -57,6 +59,8 @@ TRACKING_FILE = "processed_files.csv"
 async def download_sample_to_temp_file(sample, temp_dir_path, semaphore):
     """Download one file, handling .wav issues and recorder-prefixed names."""
     filename = normalize_wav_filename(sample.sentence_id)
+
+    print(f"This is the filename after being normalised: {filename}")
 
     arcname = f"audio/{filename}"
     local_file_path = os.path.join(temp_dir_path, filename)
@@ -116,6 +120,8 @@ def create_zip_file(zip_path, files, metadata_path, readme_path):
         for local_path, arcname in files:
             zf.write(local_path, arcname=arcname)
 
+
+
 async def multipart_upload_to_s3(async_s3_client, local_path, bucket, key):
     """Optimized parallel multipart upload to S3."""
     file_size = os.path.getsize(local_path)
@@ -171,12 +177,119 @@ async def multipart_upload_to_s3(async_s3_client, local_path, bucket, key):
     )
     logger.info(f"🎉 Multipart upload complete: {key}")
 
+
+
 # ------------------------- MAIN FUNCTION -------------------------
-async def prezip_dataset(language: str, pct: float = 100, split: Optional[str] = None):
-    """Pre-zip dataset with dynamic batching based on MAX_SINGLE_RUN."""
+# async def prezip_dataset(language: str, pct: float = 100, split: Optional[str] = None):
+#     """Pre-zip dataset with dynamic batching based on MAX_SINGLE_RUN."""
+#     session_maker = get_async_session_maker()
+
+#     # Load processed files
+#     processed_files = set()
+#     if os.path.exists(TRACKING_FILE):
+#         with open(TRACKING_FILE, newline="") as f:
+#             reader = csv.reader(f)
+#             for row in reader:
+#                 processed_files.add(row[0])
+#         logger.info(f"Loaded {len(processed_files)} already processed files.")
+
+#     from src.download.service import DownloadService
+#     download_service = DownloadService(s3_bucket_name=settings.OBS_BUCKET_NAME)
+
+#     async with session_maker() as session:
+#         samples_stream, total = await download_service.filter_core_stream(
+#             session=session,
+#             language=language,
+#             pct=pct,
+#             split=split,
+#         )
+
+#         # Collect samples excluding already processed
+#         all_samples = [s async for s in samples_stream if s.sentence_id not in processed_files]
+#         total_remaining = len(all_samples)
+#         if total_remaining == 0:
+#             logger.info("No new samples to process.")
+#             return
+
+#         # Determine batches
+#         if total_remaining <= MAX_SINGLE_RUN:
+#             batches = [all_samples]
+#             logger.info(f"Processing all {total_remaining} files in a single batch.")
+#         else:
+#             batches = [all_samples[i:i+MAX_SINGLE_RUN] for i in range(0, total_remaining, MAX_SINGLE_RUN)]
+#             logger.info(f"Processing {total_remaining} files in {len(batches)} batches of up to {MAX_SINGLE_RUN} files each.")
+
+#         batch_index = 1
+#         for batch_samples in batches:
+#             logger.info(f"--- Batch {batch_index}: {len(batch_samples)} files ---")
+#             temp_dir = tempfile.mkdtemp(prefix=f"{language}_batch{batch_index}_")
+#             files_for_zip = []
+#             meta_path = os.path.join(temp_dir, "metadata.csv")
+#             readme_path = os.path.join(temp_dir, "README.txt")
+#             semaphore = asyncio.Semaphore(CONCURRENT_DOWNLOADS)
+
+#             # Write metadata CSV
+#             async with aiofiles.open(meta_path, "w", encoding="utf-8") as f_meta:
+#                 await f_meta.write("speaker_id,transcript_id,transcript,audio_path,gender,age_group,education,duration,language,snr,domain\n")
+#                 pbar = tqdm(total=len(batch_samples), desc=f"Downloading batch {batch_index}", ncols=100)
+
+#                 async def wrapped(s):
+#                     res = await download_sample_to_temp_file(s, temp_dir, semaphore)
+#                     pbar.update(1)
+#                     return res
+
+#                 results = await asyncio.gather(*[wrapped(s) for s in batch_samples])
+#                 pbar.close()
+
+#                 for r in results:
+#                     if r:
+#                         local_path, arcname, sample = r
+#                         files_for_zip.append((local_path, arcname))
+#                         row = f'"{sample.speaker_id}","{sample.sentence_id}","{sample.sentence or ""}","{arcname}",'
+#                         row += f'"{sample.gender}","{sample.age_group}","{sample.edu_level}","{sample.duration}",'
+#                         row += f'"{sample.language}","{sample.snr}","{sample.domain}"\n'
+#                         await f_meta.write(row)
+
+#             # Write README
+#             async with aiofiles.open(readme_path, "w") as f_r:
+#                 await f_r.write(generate_readme(language, pct, False, len(batch_samples), f"Batch {batch_index}, split={split}"))
+
+#             # Create ZIP
+#             final_zip = os.path.join(temp_dir, f"{language}_split{split}_pct{pct}_batch{batch_index}.zip")
+#             await asyncio.to_thread(create_zip_file, final_zip, files_for_zip, meta_path, readme_path)
+
+#             # Upload
+#             async_s3_factory = get_async_s3_client_factory(settings, is_obs=False)
+#             async with async_s3_factory() as async_s3_client:
+#                 s3_key = f"exports/{language}_{split}_{pct}%_batch[{batch_index}].zip"
+#                 await multipart_upload_to_s3(async_s3_client, final_zip, settings.S3_BUCKET_NAME, s3_key)
+
+#             # Update tracking
+#             with open(TRACKING_FILE, "a", newline="") as f:
+#                 writer = csv.writer(f)
+#                 for s in batch_samples:
+#                     writer.writerow([s.sentence_id, s.speaker_id, s.category, s.language])
+
+#             # Clean temp folder
+#             try:
+#                 for file in os.listdir(temp_dir):
+#                     os.remove(os.path.join(temp_dir, file))
+#                 os.rmdir(temp_dir)
+#                 logger.info(f"Cleaned temp folder for batch {batch_index}")
+#             except Exception as e:
+#                 logger.warning(f"Failed to clean temp folder: {e}")
+
+#             batch_index += 1
+
+
+
+
+
+async def prezip_dataset_to_main_one(language: str, pct: float = 100, split: Optional[str] = None):
+    """Pre-zip dataset and upload to Azure with clean folder structure."""
     session_maker = get_async_session_maker()
 
-    # Load processed files
+    # Load already processed files
     processed_files = set()
     if os.path.exists(TRACKING_FILE):
         with open(TRACKING_FILE, newline="") as f:
@@ -196,7 +309,7 @@ async def prezip_dataset(language: str, pct: float = 100, split: Optional[str] =
             split=split,
         )
 
-        # Collect samples excluding already processed
+        # Filter out already processed samples
         all_samples = [s async for s in samples_stream if s.sentence_id not in processed_files]
         total_remaining = len(all_samples)
         if total_remaining == 0:
@@ -247,16 +360,15 @@ async def prezip_dataset(language: str, pct: float = 100, split: Optional[str] =
                 await f_r.write(generate_readme(language, pct, False, len(batch_samples), f"Batch {batch_index}, split={split}"))
 
             # Create ZIP
-            final_zip = os.path.join(temp_dir, f"{language}_split{split}_pct{pct}_batch{batch_index}.zip")
+            final_zip = os.path.join(temp_dir, f"Batch_{batch_index}.zip")
             await asyncio.to_thread(create_zip_file, final_zip, files_for_zip, meta_path, readme_path)
 
-            # Upload
-            async_s3_factory = get_async_s3_client_factory(settings, is_obs=False)
-            async with async_s3_factory() as async_s3_client:
-                s3_key = f"exports/{language}_{split}_{pct}%_batch[{batch_index}].zip"
-                await multipart_upload_to_s3(async_s3_client, final_zip, settings.S3_BUCKET_NAME, s3_key)
+            # Upload to Azure
+            blob_name = f"exports/{language}/{split}/Batch_{batch_index}.zip"
+            logger.info(f"Uploading batch {batch_index} to Azure: {blob_name}")
+            await upload_to_azure(container_client, final_zip, blob_name)
 
-            # Update tracking
+            # Update tracking CSV
             with open(TRACKING_FILE, "a", newline="") as f:
                 writer = csv.writer(f)
                 for s in batch_samples:
@@ -273,19 +385,11 @@ async def prezip_dataset(language: str, pct: float = 100, split: Optional[str] =
 
             batch_index += 1
 
-# ------------------------- RUN -------------------------
-# if __name__ == "__main__":
-#     import sys
-#     language = "yoruba"
-#     pct = 100
-#     split = "train"
-#     asyncio.run(prezip_dataset(language, pct, split))
 
 
 if __name__ == "__main__":
-    import sys
 
-    languages = ["igbo", "naija"]
+    languages = ["yoruba"]
     splits = ["train", "dev", "dev_test"]
     pct = 100
     BASE_CONCURRENT = 2  # default parallel combinations
@@ -312,7 +416,7 @@ if __name__ == "__main__":
     async def process_combination(language, split):
         logger.info(f"==== Starting: Language={language}, Split={split}, Pct={pct} ====")
         try:
-            await prezip_dataset(language=language, pct=pct, split=split)
+            await prezip_dataset_to_main_one(language=language, pct=pct, split=split)
         except Exception as e:
             logger.error(f"Error processing Language={language}, Split={split}: {e}", exc_info=True)
         logger.info(f"==== Finished: Language={language}, Split={split} ====")

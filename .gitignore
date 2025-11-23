@@ -15,6 +15,7 @@ hausa_yoruba_ife/
 
 yoruba_ife/
 yoruba_seun/
+check.py
 
 convert_tsv_to_excel.py
 
@@ -23,6 +24,10 @@ drive_client.py
 account.json
 push_to_db_local_sheets.py
 
+list_folder_on_s3.py
+
+list_folder_on_s3.py
+list_on_blob.py
 
 ai4gov2.pem
 insert_dataset.sql
