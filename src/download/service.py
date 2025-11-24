@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncScalarResult
 import logging
 
 from src.core.main_one_config import ACCOUNT_KEY, API_VERSION, container_client
-from src.db.models import AudioSample, DownloadLog, GenderEnum
+from src.db.models import AudioSample, DownloadLog, GenderEnum, Split
 from src.auth.schemas import TokenUser
 from src.config import settings
 from src.download.s3_config import (
@@ -265,7 +265,7 @@ class DownloadService:
         gender: GenderEnum | None = None,
         age_group: str | None = None,
         education: str | None = None,
-        split: str | None = None,
+        split: Split | None = None,
         domain: str | None = None,
     ) -> dict:
         """
@@ -423,8 +423,8 @@ class DownloadService:
         language: str,
         pct: float,
         session,
-        split: Optional[str] = None,
-    ):
+        split: Optional[Split] = None,
+    ):  
         prefix = f"exports/{language}/{split}/"
         logger.info(f"Listing Azure blobs under prefix: {prefix}")
 

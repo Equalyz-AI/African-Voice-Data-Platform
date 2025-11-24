@@ -65,21 +65,22 @@ async def preview_audio_samples(
     education: str | None = Query(None),
     domain: str | None = Query(None),
     category: str | None = Query(None),
-    split: str | None = Query(None),
-
+    split: Split | None = Query(default=Split.train, description="Split type: train, dev, or dev_test"),
     session: AsyncSession = Depends(get_session),
 ):
+
     gender = map_all_to_none(value=gender)
     age = map_all_to_none(value=age)
     education = map_all_to_none(value=education)
     domain = map_EV_to_EV(domain, language)
     category = map_all_to_none(category, language)
+    split = split.value
+
 
     gender = GenderEnum(gender) if gender else None
     category = Category(category) if category else None
     language = language.lower()
 
-    print("This is the category and language after the mapping: ", category, language, "\n\n")
     return await download_service.preview_audio_samples(
         session=session, 
         language=language, 
@@ -104,19 +105,20 @@ async def estimate_zip_size(
     education: str | None = Query(None),
     domain: str | None = Query(None),
     category: str | None = Query(None),
-    split: str | None = Query(None),
+    split: Split | None = Query(default=Split.train, description="Split type: train, dev, or dev_test"),
     session: AsyncSession = Depends(get_session),
 ):
-
     gender = map_all_to_none(value=gender)
     age = map_all_to_none(value=age)
     education = map_all_to_none(value=education)
     domain = map_EV_to_EV(domain, language)
     category = map_all_to_none(category, language)
+    split = split.value
 
     gender = GenderEnum(gender) if gender else None
     category = Category(category) if category else None
-    language = language.lower()
+
+    print(f"This is the split: {split}\n\n\n")
 
     # Get the existing Azure batch listing
     if pct != 100:
@@ -183,12 +185,11 @@ async def download_zip(
         return {"error": "Only 100% zips are available."}
 
     language = language.lower()
-
-    print(f"This is the zip files {language}\n\n\n")
+    split = split.value
 
     return await download_service.download_zip_from_azure(
         language=language,
         pct=pct,
         session=session,
-        split=split.value if split else None,
+        split=split
     )
