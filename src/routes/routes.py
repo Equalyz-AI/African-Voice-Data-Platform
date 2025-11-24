@@ -65,7 +65,7 @@ async def preview_audio_samples(
     education: str | None = Query(None),
     domain: str | None = Query(None),
     category: str | None = Query(None),
-    split: Split | None = Query(default=Split.train, description="Split type: train, dev, or dev_test"),
+    split: Split = Query(default=Split.train, description="Split type: train, dev, or dev_test"),
     session: AsyncSession = Depends(get_session),
 ):
 
@@ -105,7 +105,7 @@ async def estimate_zip_size(
     education: str | None = Query(None),
     domain: str | None = Query(None),
     category: str | None = Query(None),
-    split: Split | None = Query(default=Split.train, description="Split type: train, dev, or dev_test"),
+    split: Split = Query(default=Split.train, description="Split type: train, dev, or dev_test"),
     session: AsyncSession = Depends(get_session),
 ):
     gender = map_all_to_none(value=gender)
@@ -114,6 +114,7 @@ async def estimate_zip_size(
     domain = map_EV_to_EV(domain, language)
     category = map_all_to_none(category, language)
     split = split.value
+    language = language.lower()
 
     gender = GenderEnum(gender) if gender else None
     category = Category(category) if category else None
@@ -139,7 +140,6 @@ async def estimate_zip_size(
         return {
             "message": f"No ZIP batches found for {language}-{split}-{pct}%"
         }
-
 
     total_mb = round(sum(b["size_mb"] for b in batches), 2)
     total_bytes = int(total_mb * 1024 * 1024)
@@ -174,7 +174,7 @@ async def estimate_zip_size(
 async def download_zip(
     language: str,
     pct: int | float,
-    split: Split | None = Query(default=Split.train, description="Split type: train, dev, or dev_test"),
+    split: Split = Query(default=Split.train, description="Split type: train, dev, or dev_test"),
     current_user: TokenUser = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ):
