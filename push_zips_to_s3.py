@@ -364,7 +364,7 @@ async def prezip_dataset_to_main_one(language: str, pct: float = 100, split: Opt
             await asyncio.to_thread(create_zip_file, final_zip, files_for_zip, meta_path, readme_path)
 
             # Upload to Azure
-            blob_name = f"exports/{language}/{split}/Batch_{batch_index}.zip"
+            blob_name = f"exports2/{language}/{split}/Batch_{batch_index}.zip"
             logger.info(f"Uploading batch {batch_index} to Azure: {blob_name}")
             await upload_to_azure(container_client, final_zip, blob_name)
 

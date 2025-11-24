@@ -135,5 +135,5 @@ xmltodict==1.0.2
 yarl==1.20.1
 zipstream-new==1.1.8
 zipstream-ng==1.9.0
-azure-storage-blob
+azure-storage-blob==12.27.1
 azure-identity

@@ -57,5 +57,5 @@ zipstream-new
 nest-asyncio
 clear
 nest_asyncio
-azure-storage-blob 
+azure-storage-blob==12.27.1
 azure-identity

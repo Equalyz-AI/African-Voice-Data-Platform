@@ -116,7 +116,7 @@ def map_category_to_folder(language: str, category: Optional[str] = None) -> str
     if category == "spontaneous" and language == "igbo":
         return "spontaneous/audio"
     if category == "spontaneous" and language == "hausa":
-        return "spontaneous"
+        return "hausa"
     if category == "spontaneous" and language == "yoruba":
         return "spontaneous"
     if category == "spontaneous" and language == "naija":

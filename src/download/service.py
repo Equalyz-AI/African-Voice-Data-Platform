@@ -448,7 +448,7 @@ class DownloadService:
                     permission=BlobSasPermissions(read=True),
                     expiry=datetime.utcnow() + timedelta(hours=6),
                     protocol="https", 
-                    version=API_VERSION
+                    version="2019-07-07"
                 )
 
                 download_url = f"{container_client.url}/{name}?{sas_token}"
