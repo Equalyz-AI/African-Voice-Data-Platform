@@ -1,15 +1,20 @@
+from datetime import datetime, timedelta
+import os
 from re import split
+from azure.storage.blob import BlobSasPermissions, generate_blob_sas
 from fastapi import HTTPException, BackgroundTasks
 from fastapi.responses import StreamingResponse
 from sqlmodel import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional, Tuple
 import math
+from pathlib import PurePosixPath
 from botocore.exceptions import NoCredentialsError
 from sqlalchemy import select, and_, func
 from sqlalchemy.ext.asyncio import AsyncScalarResult
 import logging
 
+from src.core.main_one_config import ACCOUNT_KEY, API_VERSION, container_client
 from src.db.models import AudioSample, DownloadLog, GenderEnum
 from src.auth.schemas import TokenUser
 from src.config import settings
@@ -396,4 +401,82 @@ class DownloadService:
 
         except Exception as e:
             logger.error(f"Failed to list or sign zips: {e}", exc_info=True)
+            return {"error": str(e)}
+
+    
+
+    
+    async def download_zip_from_azure(
+        self,
+        language: str,
+        pct: float,
+        session,
+        split: Optional[str] = None,
+    ):
+        """
+        Returns signed Azure URLs for zip batches stored under:
+            exports/{language}/{split}/Batch_X.zip
+        """
+
+        prefix = f"exports/{language}/{split}/"
+        logger.info(f"Listing Azure blobs under prefix: {prefix}")
+
+        try:
+            # NORMAL SYNC ITERATOR
+            blob_list = container_client.list_blobs(name_starts_with=prefix)
+
+            results = []
+
+            for blob in blob_list:   # ✅ FIXED
+                name = blob.name
+
+                if not name.endswith(".zip"):
+                    continue
+
+                # Extract batch number
+                try:
+                    batch_num = int(name.split("Batch_")[-1].split(".zip")[0])
+                except:
+                    batch_num = 99999
+
+                # Generate SAS token
+                sas_token = generate_blob_sas(
+                    account_name=container_client.account_name,
+                    container_name=container_client.container_name,
+                    blob_name=name,
+                    account_key=ACCOUNT_KEY,
+                    permission=BlobSasPermissions(read=True),
+                    expiry=datetime.utcnow() + timedelta(hours=6),
+                    protocol="https", 
+                    version=API_VERSION
+                )
+
+                download_url = f"{container_client.url}/{name}?{sas_token}"
+
+                blob_name_only = PurePosixPath(name).name
+
+                results.append({
+                    "key": blob_name_only,
+                    "batch": batch_num,
+                    "size_mb": round(blob.size / (1024 * 1024), 2),
+                    "last_modified": blob.last_modified.isoformat(),
+                    "download_url": download_url,
+                })
+
+            if not results:
+                return {"message": f"No zip files found for {language}-{split}-{pct}%"}
+
+            # Sort by batch
+            results.sort(key=lambda x: x["batch"])
+
+            return {
+                "language": language,
+                "split": split,
+                "pct": pct,
+                "total_batches": len(results),
+                "batches": results,
+            }
+
+        except Exception as e:
+            logger.error(f"Azure listing/signing failed: {e}", exc_info=True)
             return {"error": str(e)}

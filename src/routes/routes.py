@@ -150,7 +150,9 @@ async def download_zip(
 
     language = language.lower()
 
-    return await download_service.download_zip_with_from_s3(
+    print(f"This is the zip files {language}\n\n\n")
+
+    return await download_service.download_zip_from_azure(
         language=language,
         pct=pct,
         session=session,
