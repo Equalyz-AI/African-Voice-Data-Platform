@@ -141,6 +141,7 @@ class DownloadService:
         domain: str | None = None,
     ):
         filters = [AudioSample.language == language]
+
         
         try:
             if gender:
@@ -181,7 +182,7 @@ class DownloadService:
         stmt = (
             select(AudioSample)
             .where(and_(*filters))
-            .order_by(AudioSample.id)
+            .order_by(func.random())
         )
         if effective_limit:
             stmt = stmt.limit(effective_limit)
@@ -292,11 +293,22 @@ class DownloadService:
         # Apply compression ratio
         estimated_zip_bytes = total_bytes * COMPRESSION_RATIO
 
+        #  Additional metadata
+        number_of_males = sum(1 for s in samples if getattr(s, "gender", "").lower() == "male")
+        number_of_females = sum(1 for s in samples if getattr(s, "gender", "").lower() == "female")
+        domains = list({getattr(s, "domain", None) for s in samples if getattr(s, "domain", None)})
+
+
+        print(f"This is the gender: {gender}\n\n\n") 
+
         return {
             "estimated_size_bytes": int(estimated_zip_bytes),
             "estimated_size_mb": round(estimated_zip_bytes / (1024 ** 2), 2),
             "sample_count": len(samples),
-            "total_duration_seconds": round(total_duration, 2)
+            "total_duration_seconds": round(total_duration, 2),
+            "number_of_males": number_of_males, 
+            "number_of_females": number_of_females,
+            "domains": domains
         }
 
 
@@ -413,33 +425,25 @@ class DownloadService:
         session,
         split: Optional[str] = None,
     ):
-        """
-        Returns signed Azure URLs for zip batches stored under:
-            exports/{language}/{split}/Batch_X.zip
-        """
-
         prefix = f"exports/{language}/{split}/"
         logger.info(f"Listing Azure blobs under prefix: {prefix}")
 
         try:
-            # NORMAL SYNC ITERATOR
             blob_list = container_client.list_blobs(name_starts_with=prefix)
 
             results = []
 
-            for blob in blob_list:   # ✅ FIXED
+            for blob in blob_list:
                 name = blob.name
 
                 if not name.endswith(".zip"):
                     continue
 
-                # Extract batch number
                 try:
                     batch_num = int(name.split("Batch_")[-1].split(".zip")[0])
                 except:
                     batch_num = 99999
 
-                # Generate SAS token
                 sas_token = generate_blob_sas(
                     account_name=container_client.account_name,
                     container_name=container_client.container_name,
@@ -447,26 +451,34 @@ class DownloadService:
                     account_key=ACCOUNT_KEY,
                     permission=BlobSasPermissions(read=True),
                     expiry=datetime.utcnow() + timedelta(hours=6),
-                    protocol="https", 
-                    version="2019-07-07"
+                    protocol="https",
+                    version=API_VERSION
                 )
 
-                download_url = f"{container_client.url}/{name}?{sas_token}"
+                # FIX: Remove container name from path
+                blob_path = name
+                prefix_to_strip = f"{container_client.container_name}/"
+
+                if blob_path.startswith(prefix_to_strip):
+                    blob_path = blob_path[len(prefix_to_strip):]
 
                 blob_name_only = PurePosixPath(name).name
 
+                container_base_url = container_client.url
+                download_url = f"{container_base_url}/{blob_path}?{sas_token}"
+
+          
                 results.append({
                     "key": blob_name_only,
                     "batch": batch_num,
                     "size_mb": round(blob.size / (1024 * 1024), 2),
                     "last_modified": blob.last_modified.isoformat(),
-                    "download_url": download_url,
+                    "download_url": await self.strip_sas_token(download_url),
                 })
 
             if not results:
                 return {"message": f"No zip files found for {language}-{split}-{pct}%"}
 
-            # Sort by batch
             results.sort(key=lambda x: x["batch"])
 
             return {
@@ -480,3 +492,22 @@ class DownloadService:
         except Exception as e:
             logger.error(f"Azure listing/signing failed: {e}", exc_info=True)
             return {"error": str(e)}
+
+
+
+
+
+
+
+
+    async def strip_sas_token(self, url: str) -> str:
+        """
+        Remove SAS query parameters from a blob URL.
+
+        Args:
+            url (str): Full blob URL with SAS token.
+
+        Returns:
+            str: Base blob URL without SAS token.
+        """
+        return url.split("?", 1)[0]

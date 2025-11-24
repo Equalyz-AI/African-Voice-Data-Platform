@@ -34,7 +34,7 @@ def map_all_to_none(value: Optional[str], language: Optional[str] = None) -> Opt
             print(f"Mapping the category {val} to spontaneous")
             return "spontaneous"
                 
-    print(f"This is the language coming from the backend")
+    print(f"This is the language coming from the backend\n\n {val}")
     return val
 
 
@@ -93,6 +93,8 @@ async def preview_audio_samples(
     )
 
 
+
+
 @download_router.get("/zip/estimate-size/{language}/{pct}", response_model=EstimatedSizeResponse)
 async def estimate_zip_size(
     language: str,
@@ -116,20 +118,53 @@ async def estimate_zip_size(
     category = Category(category) if category else None
     language = language.lower()
 
-    print("This is the category after the mapping: ", category, language)
+    # Get the existing Azure batch listing
+    if pct != 100:
+        return {"error": "Only 100% zips are available."}
+    response = await download_service.download_zip_from_azure(
+        language=language,
+        pct=pct,
+        session=session,
+        split=split,
+    )
 
-    return await download_service.estimate_zip_size_only(
+    #  Handle error or empty result
+    if "error" in response:
+        return response
+
+    batches = response.get("batches", [])
+    if not batches:
+        return {
+            "message": f"No ZIP batches found for {language}-{split}-{pct}%"
+        }
+
+
+    total_mb = round(sum(b["size_mb"] for b in batches), 2)
+    total_bytes = int(total_mb * 1024 * 1024)
+    total_gb = round(total_mb / 1024, 2)
+
+    result = await download_service.estimate_zip_size_only(
         session=session,
         language=language,
         pct=pct,
+        split=split,
         category=category,
         gender=gender,
-        age_group=age,
         education=education,
-        split=split,
         domain=domain,
-        
+        age_group=age
     )
+
+    return {
+        "estimated_size_in_bytes": total_bytes,
+        "estimated_size_in_mb": total_mb,
+        "estimated_size_in_gb": total_gb,
+        "number_of_audios": result.get("sample_count"),
+        "total_duration_in_seconds": result.get("total_duration_seconds"),
+        "number_of_males": result.get("number_of_males"),
+        "number_of_females": result.get("number_of_females"),
+        "domains": result.get("domains")
+    }
 
 
 
@@ -138,7 +173,6 @@ async def download_zip(
     language: str,
     pct: int | float,
     split: Split | None = Query(default=Split.train, description="Split type: train, dev, or dev_test"),
-    as_excel: bool = True,
     current_user: TokenUser = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ):

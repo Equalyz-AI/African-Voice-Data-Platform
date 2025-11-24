@@ -27,7 +27,11 @@ class AudioPreviewResponse(BaseModel):
 
 
 class EstimatedSizeResponse(BaseModel):
-    estimated_size_bytes: int
-    estimated_size_mb: float
-    sample_count: int
-    # total_durations: Optional[str] = None
+    estimated_size_in_bytes: Optional[float] = None
+    estimated_size_in_mb: Optional[float] = None
+    estimated_size_in_gb: Optional[float] = None
+    number_of_audios: Optional[float] = None
+    total_duration_in_seconds: Optional[float] = None
+    number_of_males: Optional[float] = None
+    number_of_females: Optional[float] = None
+    domains: Optional[list] = None
