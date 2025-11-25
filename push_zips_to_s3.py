@@ -390,7 +390,7 @@ async def prezip_dataset_to_main_one(language: str, pct: float = 100, split: Opt
 
 if __name__ == "__main__":
 
-    languages = ["yoruba"]
+    languages = ["hausa"]
     splits = ["train", "dev", "dev_test"]
     pct = 100
     BASE_CONCURRENT = 2  # default parallel combinations

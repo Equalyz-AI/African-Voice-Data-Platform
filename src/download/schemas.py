@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import Dict, List, Optional
 from pydantic import BaseModel, Field
 
 
@@ -35,3 +35,44 @@ class EstimatedSizeResponse(BaseModel):
     number_of_males: Optional[float] = None
     number_of_females: Optional[float] = None
     domains: Optional[list] = None
+
+
+
+
+
+
+class AudioItem(BaseModel):
+    audio_id: str
+    signed_url: str
+    transcript: Optional[str] = None
+    duration: Optional[float] = None
+    gender: Optional[str] = None
+    education: Optional[str] = None
+    split: Optional[str] = None
+    type: Optional[str] = None
+
+
+
+
+
+class DomainDistributionItem(BaseModel):
+    count: int
+    pct: float
+
+
+class EstimatedSizeResponse(BaseModel):
+    estimated_size_in_bytes: int
+    estimated_size_in_mb: float
+    estimated_size_in_gb: float
+    sample_count: int
+    total_duration_seconds: float
+
+    male_voicing_count: int
+    female_voicing_count: int
+    pct_male_voicings: float
+    pct_female_voicings: float
+
+    unique_male_speakers: int
+    unique_female_speakers: int
+
+    domain_distribution: Dict[str, DomainDistributionItem]

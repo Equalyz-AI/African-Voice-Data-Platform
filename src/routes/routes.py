@@ -1,14 +1,13 @@
 from ast import Not
-from fastapi import APIRouter, Depends, BackgroundTasks, Query
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from fastapi.responses import StreamingResponse
 from src.db.db import get_session
 from src.auth.utils import get_current_user
 from src.auth.schemas import TokenUser
 from src.download.service import DownloadService
-from src.download.schemas import AudioPreviewResponse, EstimatedSizeResponse
+from src.download.schemas import AudioItem, AudioPreviewResponse, EstimatedSizeResponse
 from src.db.models import  Category, GenderEnum, Split
-from typing import Optional
+from typing import Optional, Union
 from src.config import settings
 
 download_router = APIRouter()
@@ -51,52 +50,77 @@ def map_EV_to_EV(category: str | None, language: str | None = None) -> str | Non
 
 
 
+
+
+# @download_router.get(
+#     "/samples/{language}/preview",
+#     response_model=AudioPreviewResponse,
+#     summary="Preview audio samples",
+#     description="Returns a list of audio samples with presigned URLs for playback.",
+#     include_in_schema=False
+# )
+# async def preview_audio_samples(
+#     language: str,
+#     limit: int = Query(10, ge=1, le=50),
+#     gender: str | None = Query(None, alias="gender"),
+#     age: str | None = Query(None),
+#     education: str | None = Query(None),
+#     domain: str | None = Query(None),
+#     category: str | None = Query(None),
+#     split: Split = Query(default=Split.train, description="Split type: train, dev, or dev_test"),
+#     session: AsyncSession = Depends(get_session),
+# ):
+
+#     gender = map_all_to_none(value=gender)
+#     age = map_all_to_none(value=age)
+#     education = map_all_to_none(value=education)
+#     domain = map_EV_to_EV(domain, language)
+#     category = map_all_to_none(category, language)
+#     split = split.value
+
+
+#     gender = GenderEnum(gender) if gender else None
+#     category = Category(category) if category else None
+#     language = language.lower()
+
+#     return await download_service.preview_audio_samples(
+#         session=session, 
+#         language=language, 
+#         limit=limit, 
+#         gender=gender, 
+#         age_group=age, 
+#         education=education, 
+#         split=split,
+#         domain=domain, 
+#         category=category
+#     )
+
+
+
+
 @download_router.get(
     "/samples/{language}/preview",
-    response_model=AudioPreviewResponse,
+    response_model=list[AudioItem],
     summary="Preview audio samples",
     description="Returns a list of audio samples with presigned URLs for playback.",
 )
 async def preview_audio_samples(
     language: str,
-    limit: int = Query(10, ge=1, le=50),
-    gender: str | None = Query(None, alias="gender"),
-    age: str | None = Query(None),
-    education: str | None = Query(None),
-    domain: str | None = Query(None),
     category: str | None = Query(None),
     split: Split = Query(default=Split.train, description="Split type: train, dev, or dev_test"),
     session: AsyncSession = Depends(get_session),
 ):
-
-    gender = map_all_to_none(value=gender)
-    age = map_all_to_none(value=age)
-    education = map_all_to_none(value=education)
-    domain = map_EV_to_EV(domain, language)
-    category = map_all_to_none(category, language)
     split = split.value
-
-
-    gender = GenderEnum(gender) if gender else None
-    category = Category(category) if category else None
     language = language.lower()
 
-    return await download_service.preview_audio_samples(
-        session=session, 
-        language=language, 
-        limit=limit, 
-        gender=gender, 
-        age_group=age, 
-        education=education, 
-        split=split,
-        domain=domain, 
-        category=category
+    return await download_service.get_all_signed_audio(
+        language=language
     )
 
 
 
 
-@download_router.get("/zip/estimate-size/{language}/{pct}", response_model=EstimatedSizeResponse)
+@download_router.get("/zip/estimate-size/{language}/{pct}", response_model=Union[EstimatedSizeResponse, dict])
 async def estimate_zip_size(
     language: str,
     pct: int | float,
@@ -118,8 +142,6 @@ async def estimate_zip_size(
 
     gender = GenderEnum(gender) if gender else None
     category = Category(category) if category else None
-
-    print(f"This is the split: {split}\n\n\n")
 
     # Get the existing Azure batch listing
     if pct != 100:
@@ -154,19 +176,16 @@ async def estimate_zip_size(
         gender=gender,
         education=education,
         domain=domain,
-        age_group=age
+        age_group=age,
+
+        total_mb=total_mb,
+        total_bytes=total_bytes,
+        total_gb=total_gb
     )
 
-    return {
-        "estimated_size_in_bytes": total_bytes,
-        "estimated_size_in_mb": total_mb,
-        "estimated_size_in_gb": total_gb,
-        "number_of_audios": result.get("sample_count"),
-        "total_duration_in_seconds": result.get("total_duration_seconds"),
-        "number_of_males": result.get("number_of_males"),
-        "number_of_females": result.get("number_of_females"),
-        "domains": result.get("domains")
-    }
+    return result
+
+
 
 
 
@@ -182,7 +201,9 @@ async def download_zip(
 
     # enforce the only allowed pct
     if pct != 100:
-        return {"error": "Only 100% zips are available."}
+        return {
+            "error": "Only 100% zips are available."
+        }
 
     language = language.lower()
     split = split.value

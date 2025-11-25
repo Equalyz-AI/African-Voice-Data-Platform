@@ -16,20 +16,14 @@ import logging
 
 from src.core.main_one_config import ACCOUNT_KEY, API_VERSION, container_client
 from src.db.models import AudioSample, DownloadLog, GenderEnum, Split
-from src.auth.schemas import TokenUser
 from src.config import settings
 from src.download.s3_config import (
     SUPPORTED_LANGUAGES,
     generate_obs_signed_url,
     s3_aws,
 )
-from src.download.utils import (
-    stream_zip_with_metadata,
-    generate_metadata_buffer,
-    generate_readme,
-    stream_zip_to_s3,
-)
-import aioboto3
+
+from src.utils.audio_lookup import get_audio_filename
 
 logger = logging.getLogger(__name__)
 
@@ -105,7 +99,6 @@ class DownloadService:
                     filename=f"{s.sentence_id}.wav",
                     storage_link=s.storage_link,
                 ),
-                # "transcript_url_obs": map_sentence_id_to_transcript_obs(s.sentence_id, s.language, s.category, s.sentence),
                 "age_group": s.age_group,
                 "edu_level": s.edu_level,
                 "durations": s.duration,
@@ -122,7 +115,36 @@ class DownloadService:
         return {
             "samples": urls
         }
+    
 
+    async def get_all_signed_audio(self, language: str, category: str = "spontaneous"):
+        """
+        Returns a list of all audio files for a language with signed OBS URLs.
+        """
+        result = []
+
+        for audio in get_audio_filename(language=language):
+            filename = f"{audio["audio_id"]}.wav"
+            type = f"{audio["type"]}"
+
+            signed_url = generate_obs_signed_url(
+                language=language, 
+                category=type, 
+                filename=filename
+            )
+
+            result.append({
+                "audio_id": filename,
+                "signed_url": signed_url,
+                "transcript": audio.get("transcript"),
+                "duration": audio.get("duration"),
+                "gender": audio.get("gender"),
+                "education": audio.get("education"),
+                "split": audio.get("split"),
+                "type": audio.get("type")
+            })
+
+        return result
 
 
 
@@ -267,11 +289,12 @@ class DownloadService:
         education: str | None = None,
         split: Split | None = None,
         domain: str | None = None,
+
+        total_mb: float | None = None,
+        total_bytes: float | None = None,
+        total_gb: float | None = None,
     ) -> dict:
-        """
-        Estimate total dataset ZIP size using durations instead of actual file sizes.
-        """
-        # Reuse your filter logic
+
         samples, total = await self.filter_core(
             session=session,
             language=language,
@@ -284,138 +307,68 @@ class DownloadService:
             pct=pct
         )
 
+        # # -----------------------------
+        # # 1. Core duration → zip size
+        # # -----------------------------
         total_duration = sum(float(s.duration) for s in samples if s.duration)
 
-        # Compute total size in bytes based on PCM WAV assumption
-        bytes_per_sample = AUDIO_BIT_DEPTH / 8
-        total_bytes = total_duration * AUDIO_SAMPLE_RATE * bytes_per_sample * AUDIO_CHANNELS
 
-        # Apply compression ratio
-        estimated_zip_bytes = total_bytes * COMPRESSION_RATIO
+        # -----------------------------
+        # 2. Voicing counts
+        # -----------------------------
+        male_voicing_count = sum(1 for s in samples if getattr(s, "gender", "").lower() == "male")
+        female_voicing_count = sum(1 for s in samples if getattr(s, "gender", "").lower() == "female")
 
-        #  Additional metadata
-        number_of_males = sum(1 for s in samples if getattr(s, "gender", "").lower() == "male")
-        number_of_females = sum(1 for s in samples if getattr(s, "gender", "").lower() == "female")
-        domains = list({getattr(s, "domain", None) for s in samples if getattr(s, "domain", None)})
+        total_voicings = male_voicing_count + female_voicing_count
 
+        pct_male_voicings = round((male_voicing_count / total_voicings) * 100, 2) if total_voicings > 0 else 0
+        pct_female_voicings = round((female_voicing_count / total_voicings) * 100, 2) if total_voicings > 0 else 0
 
-        print(f"This is the gender: {gender}\n\n\n") 
+        # -----------------------------
+        # 3. Unique speakers
+        # -----------------------------
+        unique_male_speakers = len({s.speaker_id for s in samples if getattr(s, "gender", "").lower() == "male"})
+        unique_female_speakers = len({s.speaker_id for s in samples if getattr(s, "gender", "").lower() == "female"})
 
-        return {
-            "estimated_size_bytes": int(estimated_zip_bytes),
-            "estimated_size_mb": round(estimated_zip_bytes / (1024 ** 2), 2),
-            "sample_count": len(samples),
-            "total_duration_seconds": round(total_duration, 2),
-            "number_of_males": number_of_males, 
-            "number_of_females": number_of_females,
-            "domains": domains
+        # -----------------------------
+        # 4. Domain distribution
+        # -----------------------------
+        domain_counts = {}
+
+        for s in samples:
+            d = getattr(s, "domain", None)
+            if not d:
+                continue
+            domain_counts[d] = domain_counts.get(d, 0) + 1
+
+        domain_distribution = {
+            d: {
+                "count": count,
+                "pct": round((count / total_voicings) * 100, 2)
+            }
+            for d, count in domain_counts.items()
         }
 
+        # -----------------------------
+        # Final enriched summary
+        # -----------------------------
+        return {
+            "estimated_size__in_bytes": total_bytes,
+            "estimated_size__in_mb": total_mb,
+            "estimated_size_in_gb": total_gb,
+            "sample_count": len(samples),
+            "total_duration_seconds": round(total_duration, 2),
+            "male_voicing_count": male_voicing_count,
+            "female_voicing_count": female_voicing_count,
+            "pct_male_voicings": pct_male_voicings,
+            "pct_female_voicings": pct_female_voicings,
 
+            "unique_male_speakers": unique_male_speakers,
+            "unique_female_speakers": unique_female_speakers,
 
-    async def download_zip_with_metadata_s3(
-        self,
-        language: str,
-        pct: int | float,
-        session: AsyncSession,
-        background_tasks: BackgroundTasks,
-        current_user: TokenUser,
-        category: str = None,
-        gender: GenderEnum | None = None,
-        split: str | None = None,
-        age_group: str | None = None,
-        education: str | None = None,
-        domain: str | None = None,
-        as_excel: bool = True,
-    ):
-        # 1. Fetch samples
-        samples, total = await self.filter_core(
-            session=session,
-            language=language,
-            category=category,
-            gender=gender,
-            age_group=age_group,
-            education=education,
-            split=split,
-            domain=domain,
-            pct=pct
-        )
+            "domain_distribution": domain_distribution,
+        }
 
-        if not samples:
-            raise HTTPException(404, "No audio samples found for selected filters")
-
-        print("the total number of samples is ", total)
-        # 2. Log download
-        background_tasks.add_task(
-            session.add,
-            DownloadLog(
-                user_id=current_user.id,
-                dataset_id=samples[0].dataset_id,
-                percentage=pct,
-            ),
-        )
-        await session.commit()
-
-        return await stream_zip_to_s3(
-            language=language,
-            samples=samples,
-            as_excel=as_excel
-        )
-        
-
-    async def download_zip_with_from_s3(
-        self,
-        language: str,
-        pct: float,
-        session,
-        split: Optional[str] = None,
-    ):
-        """
-        Returns a list of signed S3 URLs for zip batches matching the pattern:
-        exports/{language}_{split}_{pct}%_batch[i].zip
-        """
-
-        prefix = f"exports/{language}_{split}_{pct}%_batch"
-        logger.info(f"Listing zips from bucket={self.s3_bucket_name}, prefix={prefix}")
-
-        try:
-            resp = s3_aws.list_objects_v2(Bucket=self.s3_bucket_name, Prefix=prefix)
-            files = resp.get("Contents", [])
-            if not files:
-                return {"message": f"No zip files found for {language}-{split}-{pct}%"}
-
-            results = []
-            for obj in files:
-                key = obj["Key"]
-                if key.endswith(".zip"):
-                    signed_url = s3_aws.generate_presigned_url(
-                        "get_object",
-                        Params={"Bucket": self.s3_bucket_name, "Key": key},
-                        ExpiresIn=3600 * 6,  # 6 hours expiry
-                    )
-                    results.append({
-                        "key": key,
-                        "size_mb": round(obj["Size"] / (1024 * 1024), 2),
-                        "last_modified": obj["LastModified"].isoformat(),
-                        "download_url": signed_url,
-                    })
-
-            # Sort by batch number
-            results.sort(key=lambda x: int(x["key"].split("batch[")[-1].split("]")[0]))
-
-            return {
-                "language": language,
-                "split": split,
-                "pct": pct,
-                "total_batches": len(results),
-                "batches": results,
-            }
-
-        except Exception as e:
-            logger.error(f"Failed to list or sign zips: {e}", exc_info=True)
-            return {"error": str(e)}
-
-    
 
     
     async def download_zip_from_azure(
