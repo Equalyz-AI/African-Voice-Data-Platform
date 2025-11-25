@@ -5,7 +5,7 @@ from src.db.db import get_session
 from src.auth.utils import get_current_user
 from src.auth.schemas import TokenUser
 from src.download.service import DownloadService
-from src.download.schemas import AudioItem, AudioPreviewResponse, EstimatedSizeResponse
+from src.download.schemas import AudioItem, AudioPreviewResponse, DownloadZipResponseUnion, EstimatedSizeResponse
 from src.db.models import  Category, GenderEnum, Split
 from typing import Optional, Union
 from src.config import settings
@@ -189,7 +189,7 @@ async def estimate_zip_size(
 
 
 
-@download_router.get("/zip/{language}/{pct}", response_model=dict)
+@download_router.get("/zip/{language}/{pct}", response_model=DownloadZipResponseUnion)
 async def download_zip(
     language: str,
     pct: int | float,

@@ -1,7 +1,7 @@
 from pydantic import BaseModel
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union
 from pydantic import BaseModel, Field
-
+from datetime import datetime
 
 class AudioSamplePreview(BaseModel):
     id: Optional[str] = Field(default=None)
@@ -38,9 +38,6 @@ class EstimatedSizeResponse(BaseModel):
 
 
 
-
-
-
 class AudioItem(BaseModel):
     audio_id: str
     signed_url: str
@@ -50,9 +47,6 @@ class AudioItem(BaseModel):
     education: Optional[str] = None
     split: Optional[str] = None
     type: Optional[str] = None
-
-
-
 
 
 class DomainDistributionItem(BaseModel):
@@ -76,3 +70,33 @@ class EstimatedSizeResponse(BaseModel):
     unique_female_speakers: int
 
     domain_distribution: Dict[str, DomainDistributionItem]
+
+
+
+
+class AzureBatchItem(BaseModel):
+    key: str
+    batch: int
+    size_mb: float
+    last_modified: datetime
+    download_url: str
+
+class DownloadZipResponse(BaseModel):
+    language: str
+    split: Optional[str] = None
+    pct: float
+    total_batches: int
+    batches: List[AzureBatchItem]
+
+class DownloadZipErrorResponse(BaseModel):
+    error: str
+
+class DownloadZipMessageResponse(BaseModel):
+    message: str
+
+
+DownloadZipResponseUnion = Union[
+    DownloadZipResponse,
+    DownloadZipErrorResponse,
+    DownloadZipMessageResponse
+]
