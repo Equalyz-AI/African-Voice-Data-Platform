@@ -124,8 +124,8 @@ class DownloadService:
         result = []
 
         for audio in get_audio_filename(language=language):
-            filename = f"{audio["audio_id"]}.wav"
-            type = f"{audio["type"]}"
+            filename = f"{audio['audio_id']}.wav"
+            type = f"{audio['type']}"
 
             signed_url = generate_obs_signed_url(
                 language=language, 
