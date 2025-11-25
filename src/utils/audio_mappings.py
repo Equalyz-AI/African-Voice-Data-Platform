@@ -315,6 +315,18 @@ HAUSA_AUDIO_MAP = [
 
 
 IGBO_AUDIO_MAP = [
+     {
+        "audio_id": "ibo_FN_001_000438_R5",
+        "speaker_id": "IBUT1F9",
+        "transcript": "Onye na-etinye ego ji nlezianya nyochaa akwụkwọ ego nke ọnwa atọ kwa afọ, tupu ya emee mgbanwe ọ bụla na pọtụfoliyo ntinye ego ya.",
+        "duration": 7.92,
+        "gender": "female",
+        "age_group": "15-29",
+        "education": "Tertiary",
+        "domain": "BU",
+        "split": "train",
+        "type": "spontaneous"
+    },
     {
         "audio_id": "ibo_SE2_22_REID_R2",
         "speaker_id": "IECT1F37",
@@ -360,18 +372,6 @@ IGBO_AUDIO_MAP = [
         "age_group": "30-45",
         "education": "Tertiary",
         "domain": "EV",
-        "split": "train",
-        "type": "spontaneous"
-    },
-    {
-        "audio_id": "ibo_FN_001_000438_R5",
-        "speaker_id": "IBUT1F9",
-        "transcript": "Onye na-etinye ego ji nlezianya nyochaa akwụkwọ ego nke ọnwa atọ kwa afọ, tupu ya emee mgbanwe ọ bụla na pọtụfoliyo ntinye ego ya.",
-        "duration": 7.92,
-        "gender": "female",
-        "age_group": "15-29",
-        "education": "Tertiary",
-        "domain": "BU",
         "split": "train",
         "type": "spontaneous"
     },
@@ -435,16 +435,16 @@ IGBO_AUDIO_MAP = [
         "split": "test",
         "type": "spontaneous"
     },
-    {
-        "audio_id": "ibo_eve_036010_R1",
-        "speaker_id": "IECT2M26",
-        "transcript": "[um] Anyị ji obi [um] ùtò hụ́ na ọ̀ dị́ otú ahụ.",
-        "duration": 9.58,
-        "gender": "male",
-        "age_group": "30-45",
-        "education": "Tertiary",
-        "domain": "EV",
-        "split": "train",
-        "type": "spontaneous"
-    }
+    # {
+    #     "audio_id": "ibo_eve_036010_R1",
+    #     "speaker_id": "IECT2M26",
+    #     "transcript": "[um] Anyị ji obi [um] ùtò hụ́ na ọ̀ dị́ otú ahụ.",
+    #     "duration": 9.58,
+    #     "gender": "male",
+    #     "age_group": "30-45",
+    #     "education": "Tertiary",
+    #     "domain": "EV",
+    #     "split": "train",
+    #     "type": "spontaneous"
+    # }
 ]
