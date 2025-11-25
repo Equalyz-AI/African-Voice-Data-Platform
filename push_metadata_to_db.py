@@ -53,6 +53,9 @@ def load_excel_records(file_path: Path) -> List[AudioSample]:
     else:
         raise ValueError(f"Unsupported file type: {suffix}")
 
+
+    df.columns = df.columns.str.lower().str.strip()
+
     language = file_path.stem.split(".")[0]
     # split = get_split_from_filename(file_path.name)
 
@@ -61,11 +64,12 @@ def load_excel_records(file_path: Path) -> List[AudioSample]:
         sentence_id = str(row.get("audio_id") or "").strip()
         if not sentence_id:
             print(f"This row will be skipped because it has no audio ID: {sentence_id}")
-            continue  # Skip rows without unique 
+            continue  # Skip rows without unique
 
         records.append(
             AudioSample(
                 sentence_id=sentence_id,
+                audio_id=str(row.get("new_audio_id") or "").strip(),
                 sentence=str(row.get("transcript") or row.get("text") or "").strip(),
                 storage_link=str(row.get("audio_path") or "").strip(),
                 speaker_id=str(row.get("speaker_id") or "").strip(),

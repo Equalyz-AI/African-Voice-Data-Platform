@@ -335,7 +335,7 @@ async def prezip_dataset_to_main_one(language: str, pct: float = 100, split: Opt
 
             # Write metadata CSV
             async with aiofiles.open(meta_path, "w", encoding="utf-8") as f_meta:
-                await f_meta.write("speaker_id,transcript_id,transcript,audio_path,gender,age_group,education,duration,language,snr,domain\n")
+                await f_meta.write("speaker_id,audio_id,transcript,audio_path,gender,age_group,education,duration,language,snr,domain\n")
                 pbar = tqdm(total=len(batch_samples), desc=f"Downloading batch {batch_index}", ncols=100)
 
                 async def wrapped(s):
@@ -350,7 +350,7 @@ async def prezip_dataset_to_main_one(language: str, pct: float = 100, split: Opt
                     if r:
                         local_path, arcname, sample = r
                         files_for_zip.append((local_path, arcname))
-                        row = f'"{sample.speaker_id}","{sample.sentence_id}","{sample.sentence or ""}","{arcname}",'
+                        row = f'"{sample.speaker_id}","{sample.audio_id}","{sample.sentence or ""}","{arcname}",'
                         row += f'"{sample.gender}","{sample.age_group}","{sample.edu_level}","{sample.duration}",'
                         row += f'"{sample.language}","{sample.snr}","{sample.domain}"\n'
                         await f_meta.write(row)
@@ -364,7 +364,8 @@ async def prezip_dataset_to_main_one(language: str, pct: float = 100, split: Opt
             await asyncio.to_thread(create_zip_file, final_zip, files_for_zip, meta_path, readme_path)
 
             # Upload to Azure
-            blob_name = f"exports2/{language}/{split}/Batch_{batch_index}.zip"
+            blob_name = f"exports/{language}/{split}/Batch_{batch_index}.zip"
+
             logger.info(f"Uploading batch {batch_index} to Azure: {blob_name}")
             await upload_to_azure(container_client, final_zip, blob_name)
 

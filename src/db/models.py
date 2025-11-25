@@ -80,7 +80,7 @@ class AudioSample(SQLModel, table=True):
             default=lambda: str(uuid.uuid4())
         )
     )
-
+    audio_id: Optional[str] = Field(default=None)
     dataset_id: Optional[str] = Field(foreign_key="dataset.id", nullable=True, default="naija")
 
     sentence_id: Optional[str] = Field(default=None)

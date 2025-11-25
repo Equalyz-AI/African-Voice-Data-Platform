@@ -2,15 +2,14 @@ from src.db.models import AudioSample
 import  io
 import pandas as pd
 from typing import Optional, List
-import datetime
+from datetime import datetime
 import requests
 import aiohttp
 import asyncio, os, aioboto3
 from fastapi import HTTPException
 from src.db.models import AudioSample
 from src.download.s3_config import s3_aws
-from src.download.s3_config import generate_obs_signed_url, map_sentence_id_to_transcript_obs
-from sqlmodel import select, and_
+from src.download.s3_config import generate_obs_signed_url
 from src.config import settings
 from zipstream.ng import ZipStream, ZIP_DEFLATED
 
@@ -70,9 +69,9 @@ def generate_metadata_buffer(samples: List[AudioSample], as_excel=True):
     """Create metadata buffer in either Excel or CSV."""
     df = pd.DataFrame([{
         "speaker_id": s.speaker_id,
-        "transcript_id": s.sentence_id,
+        "audio_id": s.audio_id,
         "transcript": s.sentence or "",
-        "audio_path": f"audio/{s.sentence_id}.wav",
+        "audio_path": f"audio/{s.audio_id}.wav",
         "gender": s.gender,
         "age_group": s.age_group,
         "edu_level": s.edu_level,
@@ -95,6 +94,8 @@ def generate_metadata_buffer(samples: List[AudioSample], as_excel=True):
 
 
 def generate_readme(language: str, pct: int, as_excel: bool, num_samples: int, sentence_id: Optional[str]=None) -> str:
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+
     return f"""\
 
         📘 Dataset Export Summary
@@ -103,11 +104,11 @@ def generate_readme(language: str, pct: int, as_excel: bool, num_samples: int, s
         Percentage       : {pct}%
         Total Samples    : {num_samples}
         File Format      : {"Excel (.xlsx)" if as_excel else "CSV (.csv)"}
-        Date             : {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+        Date             : {timestamp}
 
         📁 Folder Structure
         ===================
-        {language}_{pct}pct_<date>/
+        {language}_{pct}pct_<{timestamp}>/
         ├── metadata.{"xlsx" if as_excel else "csv"}   - Tabular data with metadata
         ├── README.txt                                 - This file
         └── audio/                                     - Folder with audio clips
