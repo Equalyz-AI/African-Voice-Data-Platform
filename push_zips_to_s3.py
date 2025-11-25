@@ -62,7 +62,8 @@ async def download_sample_to_temp_file(sample, temp_dir_path, semaphore):
 
     print(f"This is the filename after being normalised: {filename}")
 
-    arcname = f"audio/{filename}"
+    # arcname = f"audio/{filename}"
+    arcname = f"audio/{sample.audio_id}"
     local_file_path = os.path.join(temp_dir_path, filename)
 
     if os.path.exists(local_file_path):

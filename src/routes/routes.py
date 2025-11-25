@@ -5,7 +5,7 @@ from src.db.db import get_session
 from src.auth.utils import get_current_user
 from src.auth.schemas import TokenUser
 from src.download.service import DownloadService
-from src.download.schemas import AudioItem, AudioPreviewResponse, DownloadZipResponseUnion, EstimatedSizeResponse
+from src.download.schemas import AudioItem, AudioPreviewResponse, AudioSamplePreview, DownloadZipResponseUnion, EstimatedSizeResponse
 from src.db.models import  Category, GenderEnum, Split
 from typing import Optional, Union
 from src.config import settings
@@ -100,7 +100,7 @@ def map_EV_to_EV(category: str | None, language: str | None = None) -> str | Non
 
 @download_router.get(
     "/samples/{language}/preview",
-    response_model=list[AudioItem],
+    response_model=AudioPreviewResponse,
     summary="Preview audio samples",
     description="Returns a list of audio samples with presigned URLs for playback.",
 )
@@ -113,9 +113,26 @@ async def preview_audio_samples(
     split = split.value
     language = language.lower()
 
-    return await download_service.get_all_signed_audio(
+    result =  await download_service.get_all_signed_audio(
         language=language
     )
+
+    samples = [
+        AudioSamplePreview(
+            annotator_id=audio.get("annotator_id"),
+            sentence_id=audio.get("annotator_id"),
+            audio_url_obs=audio.get("audio_url_obs"),
+            sentence=audio.get("sentence"),
+            storage_link=audio.get("storage_link"),
+            duration=audio.get("duration"),
+            gender=audio.get("gender"),
+            edu_level=audio.get("education"),
+            category=audio.get("category"),
+        )
+        for audio in result
+    ]
+
+    return AudioPreviewResponse(samples=samples)
 
 
 

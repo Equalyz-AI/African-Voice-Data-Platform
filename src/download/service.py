@@ -134,14 +134,15 @@ class DownloadService:
             )
 
             result.append({
-                "audio_id": filename,
-                "signed_url": signed_url,
-                "transcript": audio.get("transcript"),
+                "annotator_id": filename,
+                "audio_url_obs": signed_url,
+                "sentence": audio.get("transcript"),
+                "storage_link": signed_url,
                 "duration": audio.get("duration"),
                 "gender": audio.get("gender"),
                 "education": audio.get("education"),
                 "split": audio.get("split"),
-                "type": audio.get("type")
+                "category": audio.get("type")
             })
 
         return result

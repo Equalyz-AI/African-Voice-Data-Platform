@@ -4,7 +4,6 @@ from pydantic import BaseModel, Field
 from datetime import datetime
 
 class AudioSamplePreview(BaseModel):
-    id: Optional[str] = Field(default=None)
     annotator_id: str
     sentence_id: Optional[str] = Field(default=None)
     sentence: Optional[str] = Field(default=None)
@@ -14,7 +13,7 @@ class AudioSamplePreview(BaseModel):
     gender: Optional[str] = Field(default=None)
     age_group: Optional[str] = Field(default=None)
     edu_level: Optional[str] = Field(default=None)
-    durations: Optional[str] = Field(default=None)
+    duration: Optional[float] = Field(default=None)
     language: Optional[str] = Field(default="naija")
     snr: Optional[int] = Field(default=40)
     domain: Optional[str] = Field(default=None)
