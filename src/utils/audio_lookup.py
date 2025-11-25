@@ -12,8 +12,8 @@ def get_audio_filename(language: str) -> str:
     if language == "naija":
         return NAIJA_AUDIO_MAP
     
-    # if language == "hausa":
-    #     return HAUSA_AUDIO_MAP
+    if language == "hausa":
+        return HAUSA_AUDIO_MAP
     
     else:
         raise HTTPException(status_code=404, detail=f"Language '{language}' not supported.")

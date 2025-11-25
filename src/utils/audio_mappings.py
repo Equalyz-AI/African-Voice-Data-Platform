@@ -122,42 +122,42 @@ YORUBA_AUDIO_MAP = [
         "split": "train",
         "type": "spontaneous"
     },
-    {
-        "audio_id": "yor_EC_001_002733_R1",
-        "speaker_id": "YECT1M2",
-        "transcript": "aládùúgbò sọ bí ọrọ̀ ajé ṣe ràn wọ́n lọ́wọ́ láti bọ",
-        "duration": 7.08,
-        "gender": "male",
-        "age_group": "15-29",
-        "education": "Tertiary",
-        "domain": "EV",
-        "split": "train",
-        "type": "spontaneous"
-    },
-    {
-        "audio_id": "yor_SC_001_002584_R1",
-        "speaker_id": "YECT1M9",
-        "transcript": "kí ọlọ́run bá wá bùkún ọ̀gbẹ́ni porta àti ìdílé wọn",
-        "duration": 5.134,
-        "gender": "male",
-        "age_group": "15-29",
-        "education": "Tertiary",
-        "domain": "EV",
-        "split": "train",
-        "type": "spontaneous"
-    },
-    {
-        "audio_id": "yor_EC_002_005561_R3",
-        "speaker_id": "YECT2M11",
-        "transcript": "tó bá mọ ohun tó ń fa ìṣòro rẹ̀",
-        "duration": 3.69,
-        "gender": "male",
-        "age_group": "30-45",
-        "education": "Tertiary",
-        "domain": "EV",
-        "split": "train",
-        "type": "spontaneous"
-    }
+    # {
+    #     "audio_id": "yor_EC_001_002733_R1",
+    #     "speaker_id": "YECT1M2",
+    #     "transcript": "aládùúgbò sọ bí ọrọ̀ ajé ṣe ràn wọ́n lọ́wọ́ láti bọ",
+    #     "duration": 7.08,
+    #     "gender": "male",
+    #     "age_group": "15-29",
+    #     "education": "Tertiary",
+    #     "domain": "EV",
+    #     "split": "train",
+    #     "type": "spontaneous"
+    # },
+    # {
+    #     "audio_id": "yor_SC_001_002584_R1",
+    #     "speaker_id": "YECT1M9",
+    #     "transcript": "kí ọlọ́run bá wá bùkún ọ̀gbẹ́ni porta àti ìdílé wọn",
+    #     "duration": 5.134,
+    #     "gender": "male",
+    #     "age_group": "15-29",
+    #     "education": "Tertiary",
+    #     "domain": "EV",
+    #     "split": "train",
+    #     "type": "spontaneous"
+    # },
+    # {
+    #     "audio_id": "yor_EC_002_005561_R3",
+    #     "speaker_id": "YECT2M11",
+    #     "transcript": "tó bá mọ ohun tó ń fa ìṣòro rẹ̀",
+    #     "duration": 3.69,
+    #     "gender": "male",
+    #     "age_group": "30-45",
+    #     "education": "Tertiary",
+    #     "domain": "EV",
+    #     "split": "train",
+    #     "type": "spontaneous"
+    # }
 ]
 
 
