@@ -58,8 +58,8 @@ TRACKING_FILE = "processed_files.csv"
 # ----------------------------- UTILS -----------------------------
 async def download_sample_to_temp_file(sample, temp_dir_path, semaphore):
     """Download one file, handling .wav issues and recorder-prefixed names."""
-    # filename = normalize_wav_filename(sample.sentence_id)
-
+    
+    file_to_download = normalize_wav_filename(sample.sentence_id)
     filename = normalize_wav_filename(sample.audio_id)
 
     print(f"filename of this audio is {filename}\n\n\n")
@@ -90,26 +90,26 @@ async def download_sample_to_temp_file(sample, temp_dir_path, semaphore):
 
     async with semaphore:
         try:
-            ok = await try_download(filename)
+            ok = await try_download(file_to_download)
 
             # If not found, try recorderXX- prefixed versions
             if not ok:
                 # Try recorder1–99 prefixes
                 for i in range(1, 100):
-                    alt = f"recorder{i}-{filename}"
+                    alt = f"recorder{i}-{file_to_download}"
                     ok = await try_download(alt)
                     if ok:
                         logger.info(f"Recovered with prefix: {alt}")
                         break
 
             if not ok:
-                logger.warning(f"❌ Not found even after prefix attempts: {filename}")
+                logger.warning(f"❌ Not found even after prefix attempts: {file_to_download}")
                 return None
 
             return local_file_path, arcname, sample
 
         except Exception as e:
-            logger.warning(f"⚠️ Error downloading {filename}: {e}")
+            logger.warning(f"⚠️ Error downloading {file_to_download}: {e}")
             return None
 
 
