@@ -58,12 +58,11 @@ TRACKING_FILE = "processed_files.csv"
 # ----------------------------- UTILS -----------------------------
 async def download_sample_to_temp_file(sample, temp_dir_path, semaphore):
     """Download one file, handling .wav issues and recorder-prefixed names."""
-    filename = normalize_wav_filename(sample.sentence_id)
+    # filename = normalize_wav_filename(sample.sentence_id)
 
-    print(f"This is the filename after being normalised: {filename}")
+    filename = normalize_wav_filename(sample.audio_id)
 
-    # arcname = f"audio/{filename}"
-    arcname = f"audio/{sample.audio_id}"
+    arcname = f"audio/{filename}"
     local_file_path = os.path.join(temp_dir_path, filename)
 
     if os.path.exists(local_file_path):
@@ -365,7 +364,7 @@ async def prezip_dataset_to_main_one(language: str, pct: float = 100, split: Opt
             await asyncio.to_thread(create_zip_file, final_zip, files_for_zip, meta_path, readme_path)
 
             # Upload to Azure
-            blob_name = f"exports/{language}/{split}/Batch_{batch_index}.zip"
+            blob_name = f"exports2/{language}/{split}/Batch_{batch_index}.zip"
 
             logger.info(f"Uploading batch {batch_index} to Azure: {blob_name}")
             await upload_to_azure(container_client, final_zip, blob_name)
