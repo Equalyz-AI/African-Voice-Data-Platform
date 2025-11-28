@@ -51,7 +51,7 @@ YORUBA_AUDIO_MAP = [
     {
         "audio_id": "yor_EC_001_003456_R1",
         "speaker_id": "YECT1F2",
-        "transcript": "ó fi ìwé ránṣẹ́ lórí ayélujára láti darapọ̀ mọ́ wa lóṣù tó ń bọ̀ nítorí ìparí ọ̀sẹ̀",
+        "transcript": "[um] ó fi ìwé ránṣẹ́ lórí ayélujára láti darapọ̀ mọ́ wa lóṣù tó ń bọ̀ nítorí ìparí ọ̀sẹ̀",
         "duration": 8.23,
         "gender": "female",
         "age_group": "15-29",
@@ -351,30 +351,7 @@ IGBO_AUDIO_MAP = [
         "split": "train",
         "type": "spontaneous"
     },
-    {
-        "audio_id": "ibo_HM4_6_R1",
-        "speaker_id": "IECT1F46",
-        "transcript": "Ọ na-asụbilata ahịhịa na-eto n'ihu ụlọ, ugboro ugboro, ka ihu ụlọ dị ọcha ma bụrụ nke na-adọta mmadụ, na-adọta mmadụ.",
-        "duration": 7.9,
-        "gender": "female",
-        "age_group": "15-29",
-        "education": "Tertiary",
-        "domain": "EV",
-        "split": "train",
-        "type": "spontaneous"
-    },
-    {
-        "audio_id": "ibo_DW_23_RE_R3",
-        "speaker_id": "IECT2F55",
-        "transcript": "Ndị nwe ụlọ nwere ike ime ka ebe ọrụ dị mma, ma ọ bụrụ na ha ege ntị n’ihe ndị ọrụ ụlọ na-ekwu [?].",
-        "duration": 7.18,
-        "gender": "female",
-        "age_group": "30-45",
-        "education": "Tertiary",
-        "domain": "EV",
-        "split": "train",
-        "type": "spontaneous"
-    },
+  
     {
         "audio_id": "ibo_ST06_350_R3",
         "speaker_id": "IECT1F66",
@@ -424,27 +401,40 @@ IGBO_AUDIO_MAP = [
         "type": "spontaneous"
     },
     {
-        "audio_id": "ibo_BTR4_05_NID_R1",
-        "speaker_id": "IECT1F24",
-        "transcript": "Mgbe nri abalị gasịrị, onye gasịrị, onye ọ bụla n’ime anyị kesara ihe ọ tụrụ aro banyere ihe ndị mere n’ụbọchị ahụ.",
-        "duration": 7.9,
-        "gender": "female",
-        "age_group": "15-29",
-        "education": "Tertiary",
-        "domain": "EV",
-        "split": "test",
-        "type": "spontaneous"
-    },
-    # {
-    #     "audio_id": "ibo_eve_036010_R1",
-    #     "speaker_id": "IECT2M26",
-    #     "transcript": "[um] Anyị ji obi [um] ùtò hụ́ na ọ̀ dị́ otú ahụ.",
-    #     "duration": 9.58,
-    #     "gender": "male",
-    #     "age_group": "30-45",
-    #     "education": "Tertiary",
-    #     "domain": "EV",
-    #     "split": "train",
-    #     "type": "spontaneous"
-    # }
+    "audio_id": "ibo_MNT_1_08_R1",
+    "speaker_id": "IECT2M4",
+    "transcript": "Ọ́nyé nkụ́zí áhụ́ tụ́rụ̀ àrò kà ị́ hìé ụ́rà nké ọ́mà, nà-élèghàrà ìhè ị́rị́bà ámà ndị́ nà-égósí ìhè kà kà njọ́.",
+    "duration": 7.42,
+    "gender": "male",
+    "age_group": "30-45",
+    "education": "Tertiary",
+    "domain": "EV",
+    "split": "train",
+    "type": "spontaneous"
+},
+{
+    "audio_id": "ibo_MNT_4_16_R2",
+    "speaker_id": "IECT1F18",
+    "transcript": "Ụ́fọ́dụ́ ndị́ ényì nà-ékpé ékpèré màkà m, ébé ndị́ ọ́zọ́ nà-àtụ́ àrò kà m chọ́tà ézígbo ọ́nyé nà-àgwọ́ ọ́rị́à.",
+    "duration": 7.195104167,
+    "gender": "female",
+    "age_group": "15-29",
+    "education": "Tertiary",
+    "domain": "EV",
+    "split": "train",
+    "type": "spontaneous"
+},
+{
+    "audio_id": "ibo_FN_001_002550_R4",
+    "speaker_id": "IBUT1F9",
+    "transcript": "mgbe isi ruru ya ala ọ ya ala ọ tara onwe ya ụta ịzụ ihe abaghi uru niile o zụrụ na ezumike ya.",
+    "duration": 7.2335,
+    "gender": "female",
+    "age_group": "15-29",
+    "education": "Tertiary",
+    "domain": "BU",
+    "split": "train",
+    "type": "spontaneous"
+}
+
 ]

@@ -16,9 +16,9 @@ hausa_yoruba_ife/
 yoruba_ife/
 yoruba_seun/
 check.py
-
+rough.py
 convert_tsv_to_excel.py
-
+delete_on_blob.py
 google_upload_to_db.py
 drive_client.py
 account.json
