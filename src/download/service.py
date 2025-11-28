@@ -134,7 +134,9 @@ class DownloadService:
         if redis:
             cached = await redis.get(cache_key)
             if cached:
-                print(f"Fetching from redis: {cache_key}\n\n{json.loads(cached)}\n\n")
+                logger.info(
+                    f"Fetching from redis: {cache_key}\n\n{json.loads(cached)}\n\n"
+                )
                 return json.loads(cached)
 
         result = []
@@ -323,7 +325,9 @@ class DownloadService:
         if redis:
             cached = await redis.get(cache_key)
             if cached:
-                print(f"Fetching from redis: {cache_key}\n\n{json.loads(cached)}\n\n")
+                logger.info(
+                    f"Fetching from redis: {cache_key}\n\n{json.loads(cached)}\n\n"
+                )
                 return json.loads(cached)
 
 
@@ -423,7 +427,9 @@ class DownloadService:
         if redis:
             cached = await redis.get(cache_key)
             if cached:
-                print(f"Fetching from redis: {cache_key}\n\n{json.loads(cached)}\n\n")
+                logger.info(
+                    f"Fetching from redis: {cache_key}\n\n{json.loads(cached)}\n\n"
+                )
                 return json.loads(cached)
 
         prefix = f"exports/{language}/{split}/"
