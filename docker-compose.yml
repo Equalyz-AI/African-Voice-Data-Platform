@@ -7,7 +7,6 @@ services:
       - ./local_db:/app/local_db
       - .:/app
     env_file: .env
-    # command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload --loop uvloop --http httptools
     restart: on-failure
     depends_on:
@@ -42,16 +41,16 @@ services:
       retries: 5
 
 
-  celery:
-    build: .
-    command: celery -A src.core.celery_app worker -l info --concurrency=16
-    depends_on:
-      - redis
-      - db
-    environment:
-      CELERY_BROKER_URL: redis://redis:6379/0
-      CELERY_RESULT_BACKEND: redis://redis:6379/0
-    restart: always
+  # celery:
+  #   build: .
+  #   command: celery -A src.core.celery_app worker -l info --concurrency=16
+  #   depends_on:
+  #     - redis
+  #     - db
+  #   environment:
+  #     CELERY_BROKER_URL: redis://redis:6379/0
+  #     CELERY_RESULT_BACKEND: redis://redis:6379/0
+  #   restart: always
 
 volumes:
   redis_data:
