@@ -1,0 +1,313 @@
+import logging
+import asyncio
+import aiofiles
+import os, re
+import tempfile
+import zipfile
+import csv
+from typing import Optional
+from tqdm.asyncio import tqdm
+import aiohttp
+from botocore.exceptions import BotoCoreError, ClientError
+
+from src.core.main_one_config import container_client
+from src.db.db import get_async_session_maker
+from src.download.main_one import upload_to_azure
+from src.download.s3_config import generate_obs_signed_url
+from src.download.s3_config_async import get_async_s3_client_factory
+from src.config import settings
+from src.download.utils import generate_readme
+
+def normalize_wav_filename(raw_name: str) -> str:
+    """
+    Normalize filename to ensure:
+    - No prefixes like 'record', 'recorder', 'mic', etc. interfere
+    - Ends with exactly one .wav
+    - Safe lowercase handling
+    """
+    name = raw_name.strip()
+
+    # Remove all leading prefixes that look like "record", "recorder", "recorder45-", etc.
+    name = re.sub(r'^(record(er)?\d*-?)', '', name, flags=re.IGNORECASE)
+
+    # Remove all trailing .wav (in case of double or triple)
+    while name.lower().endswith(".wav"):
+        name = name[:-4]
+
+    # Add back exactly one .wav
+    name = f"{name}.wav"
+
+    return name
+
+
+# ----------------------------- CONFIG -----------------------------
+logger = logging.getLogger(__name__)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+)
+CONCURRENT_DOWNLOADS = 20
+DOWNLOAD_TIMEOUT_SECONDS = 300
+CHUNK_SIZE_BYTES = 8192
+CHUNK_SIZE_UPLOAD = 64 * 1024 * 1024  # 64MB
+MAX_PARALLEL_UPLOADS = 8
+MAX_SINGLE_RUN = 8000  # Maximum files per batch
+TRACKING_FILE = "processed_files.csv"
+# ------------------------------------------------------------------
+
+# ----------------------------- UTILS -----------------------------
+async def download_sample_to_temp_file(sample, temp_dir_path, semaphore):
+    """Download one file, handling .wav issues and recorder-prefixed names."""
+
+    file_to_download = normalize_wav_filename(sample.sentence_id)
+    filename = normalize_wav_filename(sample.audio_id)
+
+    print(f"filename of this audio is {filename}\n\n\n")
+
+    arcname = f"audio/{filename}"
+    local_file_path = os.path.join(temp_dir_path, filename)
+
+    if os.path.exists(local_file_path):
+        logger.debug(f"Already exists: {filename}")
+        return local_file_path, arcname, sample
+
+    async def try_download(fname):
+        url = generate_obs_signed_url(
+            language=sample.language.lower(),
+            category=sample.category,
+            filename=fname,
+        )
+        timeout = aiohttp.ClientTimeout(total=600)
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            async with session.get(url) as response:
+                if response.status == 404:
+                    return False
+                response.raise_for_status()
+                async with aiofiles.open(local_file_path, "wb") as f:
+                    async for chunk in response.content.iter_chunked(8192):
+                        await f.write(chunk)
+        return True
+
+    async with semaphore:
+        try:
+            ok = await try_download(file_to_download)
+
+            # If not found, try recorderXX- prefixed versions
+            if not ok:
+                # Try recorder1–99 prefixes
+                for i in range(1, 100):
+                    alt = f"recorder{i}-{file_to_download}"
+                    ok = await try_download(alt)
+                    if ok:
+                        logger.info(f"Recovered with prefix: {alt}")
+                        break
+
+            if not ok:
+                logger.warning(f"❌ Not found even after prefix attempts: {file_to_download}")
+                return None
+
+            return local_file_path, arcname, sample
+
+        except Exception as e:
+            logger.warning(f"⚠️ Error downloading {file_to_download}: {e}")
+            return None
+
+
+
+def create_zip_file(zip_path, files, metadata_path, readme_path):
+    """Create ZIP file on disk without loading all files in memory."""
+    with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_STORED) as zf:
+        zf.write(metadata_path, arcname="metadata.csv")
+        zf.write(readme_path, arcname="README.txt")
+        for local_path, arcname in files:
+            zf.write(local_path, arcname=arcname)
+
+
+
+async def prezip_dataset_to_main_one(language: str, pct: float = 100, split: Optional[str] = None):
+    """Pre-zip dataset and upload to Azure with clean folder structure, starting from batch 18 onward."""
+    session_maker = get_async_session_maker()
+
+    # Load already processed files from tracking CSV
+    processed_files = set()
+    if os.path.exists(TRACKING_FILE):
+        with open(TRACKING_FILE, newline="") as f:
+            reader = csv.reader(f)
+            for row in reader:
+                processed_files.add(row[0])
+        logger.info(f"Loaded {len(processed_files)} already processed files.")
+
+    from src.download.service import DownloadService
+    download_service = DownloadService(s3_bucket_name=settings.OBS_BUCKET_NAME)
+
+    async with session_maker() as session:
+        # Get all samples
+        samples_stream, total = await download_service.filter_core_stream(
+            session=session,
+            language=language,
+            pct=pct,
+            split=split,
+        )
+
+        # Filter out already processed samples
+        all_samples = [s async for s in samples_stream if s.sentence_id not in processed_files]
+        total_remaining = len(all_samples)
+        if total_remaining == 0:
+            logger.info("No new samples to process.")
+            return
+
+        # -----------------------------
+        # Batching logic: continue from batch 18
+        # -----------------------------
+        START_BATCH = 18
+        BATCH_SIZE = MAX_SINGLE_RUN
+        already_processed_count = (START_BATCH - 1) * BATCH_SIZE
+
+        # Skip already processed samples
+        all_samples_to_process = all_samples[already_processed_count:]
+        total_remaining = len(all_samples_to_process)
+
+        if total_remaining == 0:
+            logger.info(f"No new samples to process after batch {START_BATCH-1}.")
+            return
+
+        # Split into batches
+        if total_remaining <= BATCH_SIZE:
+            batches = [all_samples_to_process]
+            logger.info(f"Processing all {total_remaining} files in a single batch.")
+        else:
+            batches = [all_samples_to_process[i:i+BATCH_SIZE] for i in range(0, total_remaining, BATCH_SIZE)]
+            logger.info(f"Processing {total_remaining} files in {len(batches)} batches of up to {BATCH_SIZE} files each.")
+
+        batch_index = START_BATCH
+        for batch_samples in batches:
+            logger.info(f"--- Batch {batch_index}: {len(batch_samples)} files ---")
+            temp_dir = tempfile.mkdtemp(prefix=f"{language}_batch{batch_index}_")
+            files_for_zip = []
+            meta_path = os.path.join(temp_dir, "metadata.csv")
+            readme_path = os.path.join(temp_dir, "README.txt")
+            semaphore = asyncio.Semaphore(CONCURRENT_DOWNLOADS)
+
+            # Write metadata CSV
+            async with aiofiles.open(meta_path, "w", encoding="utf-8") as f_meta:
+                await f_meta.write("speaker_id,audio_id,transcript,audio_path,gender,age_group,education,duration,language,snr,domain\n")
+                pbar = tqdm(total=len(batch_samples), desc=f"Downloading batch {batch_index}", ncols=100)
+
+                async def wrapped(s):
+                    res = await download_sample_to_temp_file(s, temp_dir, semaphore)
+                    pbar.update(1)
+                    return res
+
+                results = await asyncio.gather(*[wrapped(s) for s in batch_samples])
+                pbar.close()
+
+                for r in results:
+                    if r:
+                        local_path, arcname, sample = r
+                        files_for_zip.append((local_path, arcname))
+                        row = f'"{sample.speaker_id}","{sample.audio_id}","{sample.sentence or ""}","{arcname}",'
+                        row += f'"{sample.gender}","{sample.age_group}","{sample.edu_level}","{sample.duration}",'
+                        row += f'"{sample.language}","{sample.snr}","{sample.domain}"\n'
+                        await f_meta.write(row)
+
+            # Write README
+            async with aiofiles.open(readme_path, "w") as f_r:
+                await f_r.write(generate_readme(language, pct, False, len(batch_samples), f"Batch {batch_index}, split={split}"))
+
+            # Create ZIP
+            final_zip = os.path.join(temp_dir, f"Batch_{batch_index}.zip")
+            await asyncio.to_thread(create_zip_file, final_zip, files_for_zip, meta_path, readme_path)
+
+            # Upload to Azure
+            blob_name = f"exports/{language}/{split}/Batch_{batch_index}.zip"
+            logger.info(f"Uploading batch {batch_index} to Azure: {blob_name}")
+            await upload_to_azure(container_client, final_zip, blob_name)
+
+            # Update tracking CSV
+            with open(TRACKING_FILE, "a", newline="") as f:
+                writer = csv.writer(f)
+                for s in batch_samples:
+                    writer.writerow([s.sentence_id, s.speaker_id, s.category, s.language])
+
+            # Clean temp folder
+            try:
+                for file in os.listdir(temp_dir):
+                    os.remove(os.path.join(temp_dir, file))
+                os.rmdir(temp_dir)
+                logger.info(f"Cleaned temp folder for batch {batch_index}")
+            except Exception as e:
+                logger.warning(f"Failed to clean temp folder: {e}")
+
+            batch_index += 1
+
+
+
+if __name__ == "__main__":
+
+    languages = ["naija"]
+    splits = ["train"]
+    pct = 100
+    BASE_CONCURRENT = 2  # default parallel combinations
+
+    from src.download.service import DownloadService
+    download_service = DownloadService(s3_bucket_name=settings.OBS_BUCKET_NAME)
+    session_maker = get_async_session_maker()
+
+    async def estimate_total_files(language, split):
+        """Quickly get total files for a language+split without downloading."""
+        async with session_maker() as session:
+            try:
+                _, total = await download_service.filter_core_stream(
+                    session=session,
+                    language=language,
+                    pct=pct,
+                    split=split,
+                )
+                return total
+            except ValueError:
+                logger.warning(f"No audio samples found for Language={language}, Split={split}. Skipping.")
+                return 0
+
+    async def process_combination(language, split):
+        logger.info(f"==== Starting: Language={language}, Split={split}, Pct={pct} ====")
+        try:
+            await prezip_dataset_to_main_one(language=language, pct=pct, split=split)
+        except Exception as e:
+            logger.error(f"Error processing Language={language}, Split={split}: {e}", exc_info=True)
+        logger.info(f"==== Finished: Language={language}, Split={split} ====")
+
+    async def main_loop():
+        # Step 1: Estimate totals for all combinations
+        estimates = []
+        for language in languages:
+            for split in splits:
+                total_files = await estimate_total_files(language, split)
+                if total_files > 0:
+                    estimates.append((language, split, total_files))
+                    logger.info(f"Estimate: {language}-{split} -> {total_files} files\n\n")
+                else:
+                    logger.info(f"Skipping {language}-{split} because there are no files.\n\n")
+
+        if not estimates:
+            logger.info("No valid language/split combinations found. Exiting.\n\n")
+            return
+
+        # Step 2: Adjust max concurrent runs dynamically
+        semaphore = asyncio.Semaphore(BASE_CONCURRENT)
+        if any(total > MAX_SINGLE_RUN for _, _, total in estimates):
+            semaphore = asyncio.Semaphore(1)
+            logger.info("Detected large batch (>50k files). Limiting to 1 concurrent combination.\n")
+
+        # Step 3: Launch tasks with semaphore
+        tasks = []
+        for language, split, _ in estimates:
+            async def wrapped(lang=language, sp=split):
+                async with semaphore:
+                    await process_combination(lang, sp)
+            tasks.append(wrapped())
+
+        await asyncio.gather(*tasks)
+
+    asyncio.run(main_loop())
+
+
