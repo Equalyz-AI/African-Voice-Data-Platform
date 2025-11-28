@@ -12,7 +12,7 @@ from contextlib import asynccontextmanager
 from redis.asyncio import Redis
 from fastapi.requests import Request
 from typing import cast
-# from src.db.redis import init_redis_client
+from src.db.redis import init_redis_client
 from src.config import settings
 from src.logging_config import setup_logging
 setup_logging()
@@ -33,16 +33,16 @@ version_prefix = f"/api/{version}"
 async def lifespan(app: FastAPI):
 
     try:
-        # app.state.redis = await init_redis_client(
-        #     settings.REDIS_HOST,
-        #     settings.REDIS_PORT,
-        #     settings.REDIS_USERNAME,
-        #     settings.REDIS_PASSWORD,
-        # )
+        app.state.redis = await init_redis_client(
+            settings.REDIS_HOST,
+            settings.REDIS_PORT,
+            settings.REDIS_USERNAME,
+            settings.REDIS_PASSWORD,
+        )
         
-        # redis = cast(Redis, app.state.redis)
-        # await redis.set("somekey", "Redis is working")
-        # await redis.flushdb()
+        redis = cast(Redis, app.state.redis)
+        await redis.set("somekey", "Redis is working")
+        await redis.flushdb()
         pass
     except Exception as e:
         print(f"Error connecting to Redis: {e}")

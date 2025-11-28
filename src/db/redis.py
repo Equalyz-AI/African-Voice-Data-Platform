@@ -23,6 +23,7 @@ def init_redis_client(
     if REDIS_PASSWORD:
         redis_config["password"] = REDIS_PASSWORD
 
+    print("Redis is initialised")
     return Redis(**redis_config)
 
 

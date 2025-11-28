@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-import os
+import os, json
 from re import split
 from azure.storage.blob import BlobSasPermissions, generate_blob_sas
 from fastapi import HTTPException, BackgroundTasks
@@ -8,6 +8,7 @@ from sqlmodel import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional, Tuple
 import math
+from redis.asyncio import Redis
 from pathlib import PurePosixPath
 from botocore.exceptions import NoCredentialsError
 from sqlalchemy import select, and_, func
@@ -117,10 +118,25 @@ class DownloadService:
         }
     
 
-    async def get_all_signed_audio(self, language: str, category: str = "spontaneous"):
+    async def get_all_signed_audio(
+        self, 
+        language: str, 
+        redis: Optional[Redis] = None, 
+        split: Optional[str] = "train",
+        category: Optional[str] = "spontaneous"
+    ):
         """
         Returns a list of all audio files for a language with signed OBS URLs.
         """
+        cache_key = f"preview_audios:{language}"
+
+        # If redis available, try to get cached data
+        if redis:
+            cached = await redis.get(cache_key)
+            if cached:
+                print(f"Fetching from redis: {cache_key}\n\n{json.loads(cached)}\n\n")
+                return json.loads(cached)
+
         result = []
 
         for audio in get_audio_filename(language=language):
@@ -144,10 +160,12 @@ class DownloadService:
                 "split": audio.get("split"),
                 "category": audio.get("type")
             })
+        
+        # Save result in Redis for 1 hour
+        if redis:
+            await redis.set(cache_key, json.dumps(result), ex=3600)
 
         return result
-
-
 
 
     async def filter_core(
@@ -294,7 +312,20 @@ class DownloadService:
         total_mb: float | None = None,
         total_bytes: float | None = None,
         total_gb: float | None = None,
+        redis: Optional[Redis] = None, 
     ) -> dict:
+
+        print(f"estimate_zip_size:{language}:{split}:{total_gb}\n\n\n")
+
+        cache_key = f"estimate_zip_size:{language}:{split}:{total_gb}"
+
+        # If redis available, try to get cached data
+        if redis:
+            cached = await redis.get(cache_key)
+            if cached:
+                print(f"Fetching from redis: {cache_key}\n\n{json.loads(cached)}\n\n")
+                return json.loads(cached)
+
 
         samples, total = await self.filter_core(
             session=session,
@@ -353,7 +384,7 @@ class DownloadService:
         # -----------------------------
         # Final enriched summary
         # -----------------------------
-        return {
+        result =  {
             "estimated_size__in_bytes": total_bytes,
             "estimated_size__in_mb": total_mb,
             "estimated_size_in_gb": total_gb,
@@ -370,6 +401,12 @@ class DownloadService:
             "domain_distribution": domain_distribution,
         }
 
+        # Save result in Redis for 72 hour
+        if redis:
+            await redis.set(cache_key, json.dumps(result), ex=259200)
+
+        return result
+
 
     
     async def download_zip_from_azure(
@@ -378,7 +415,17 @@ class DownloadService:
         pct: float,
         session,
         split: Optional[Split] = None,
+        redis: Optional[Redis] = None, 
     ):  
+        cache_key = f"download_zip_from_azure:{language}:{split}:{pct}"
+
+        # If redis available, try to get cached data
+        if redis:
+            cached = await redis.get(cache_key)
+            if cached:
+                print(f"Fetching from redis: {cache_key}\n\n{json.loads(cached)}\n\n")
+                return json.loads(cached)
+
         prefix = f"exports/{language}/{split}/"
         logger.info(f"Listing Azure blobs under prefix: {prefix}")
 
@@ -435,7 +482,7 @@ class DownloadService:
 
             results.sort(key=lambda x: x["batch"])
 
-            return {
+            response =  {
                 "language": language,
                 "split": split,
                 "pct": pct,
@@ -443,15 +490,15 @@ class DownloadService:
                 "batches": results,
             }
 
+            # Save result in Redis for 72 hour
+            if redis:
+                await redis.set(cache_key, json.dumps(response), ex=259200)
+
+            return response
+
         except Exception as e:
             logger.error(f"Azure listing/signing failed: {e}", exc_info=True)
             return {"error": str(e)}
-
-
-
-
-
-
 
 
     async def strip_sas_token(self, url: str) -> str:

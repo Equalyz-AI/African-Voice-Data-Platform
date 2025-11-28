@@ -1,13 +1,15 @@
 from ast import Not
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
+from typing import Optional, Union, Literal
+
+from src.db.redis import make_cache_key
 from src.db.db import get_session
 from src.auth.utils import get_current_user
 from src.auth.schemas import TokenUser
 from src.download.service import DownloadService
 from src.download.schemas import AudioItem, AudioPreviewResponse, AudioSamplePreview, DownloadZipResponseUnion, EstimatedSizeResponse
 from src.db.models import  Category, GenderEnum, Split
-from typing import Optional, Union
 from src.config import settings
 
 download_router = APIRouter()
@@ -97,7 +99,6 @@ def map_EV_to_EV(category: str | None, language: str | None = None) -> str | Non
 
 
 
-
 @download_router.get(
     "/samples/{language}/preview",
     response_model=AudioPreviewResponse,
@@ -106,15 +107,22 @@ def map_EV_to_EV(category: str | None, language: str | None = None) -> str | Non
 )
 async def preview_audio_samples(
     language: str,
-    category: str | None = Query(None),
+    request: Request,
+    category: Literal["read", "spontaneous"] = Query(default="spontaneous"),
     split: Split = Query(default=Split.train, description="Split type: train, dev, or dev_test"),
     session: AsyncSession = Depends(get_session),
 ):
     split = split.value
     language = language.lower()
 
+    redis = request.app.state.redis if request.app.state.redis else None
+
+
     result =  await download_service.get_all_signed_audio(
-        language=language
+        language=language,
+        split=split,
+        category=category,
+        redis=redis
     )
 
     samples = [
@@ -131,14 +139,13 @@ async def preview_audio_samples(
         )
         for audio in result
     ]
-
     return AudioPreviewResponse(samples=samples)
-
 
 
 
 @download_router.get("/zip/estimate-size/{language}/{pct}", response_model=Union[EstimatedSizeResponse, dict])
 async def estimate_zip_size(
+    request: Request,
     language: str,
     pct: int | float,
     gender: str | None = Query(None),
@@ -163,6 +170,9 @@ async def estimate_zip_size(
     # Get the existing Azure batch listing
     if pct != 100:
         return {"error": "Only 100% zips are available."}
+
+    redis = request.app.state.redis if request.app.state.redis else None
+
     response = await download_service.download_zip_from_azure(
         language=language,
         pct=pct,
@@ -197,7 +207,9 @@ async def estimate_zip_size(
 
         total_mb=total_mb,
         total_bytes=total_bytes,
-        total_gb=total_gb
+        total_gb=total_gb,
+
+        redis=redis
     )
 
     return result
@@ -210,12 +222,14 @@ async def estimate_zip_size(
 async def download_zip(
     language: str,
     pct: int | float,
+    request: Request,
     split: Split = Query(default=Split.train, description="Split type: train, dev, or dev_test"),
     current_user: TokenUser = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ):
     """Download pre-zipped data batches for a specific language and split."""
 
+    redis = request.app.state.redis if request.app.state.redis else None
     # enforce the only allowed pct
     if pct != 100:
         return {
@@ -229,5 +243,6 @@ async def download_zip(
         language=language,
         pct=pct,
         session=session,
-        split=split
+        split=split,
+        redis=redis
     )
