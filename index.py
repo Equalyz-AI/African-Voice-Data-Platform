@@ -10,9 +10,9 @@ from tqdm.asyncio import tqdm
 import aiohttp
 from botocore.exceptions import BotoCoreError, ClientError
 
-from src.core.main_one_config import container_client
+from src.core.main_one_config import ACCOUNT_NAME, container_client
 from src.db.db import get_async_session_maker
-from src.download.main_one import upload_to_azure
+from src.download.main_one import multipart_upload_to_azure, upload_to_azure
 from src.download.s3_config import generate_obs_signed_url
 from src.download.s3_config_async import get_async_s3_client_factory
 from src.config import settings
@@ -58,7 +58,7 @@ TRACKING_FILE = "processed_files.csv"
 # ----------------------------- UTILS -----------------------------
 async def download_sample_to_temp_file(sample, temp_dir_path, semaphore):
     """Download one file, handling .wav issues and recorder-prefixed names."""
-
+    
     file_to_download = normalize_wav_filename(sample.sentence_id)
     filename = normalize_wav_filename(sample.audio_id)
 
@@ -115,20 +115,19 @@ async def download_sample_to_temp_file(sample, temp_dir_path, semaphore):
 
 
 def create_zip_file(zip_path, files, metadata_path, readme_path):
-    """Create ZIP file on disk without loading all files in memory."""
-    with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_STORED) as zf:
+    """Create compressed ZIP using ZIP_LZMA."""
+    with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_LZMA) as zf:
         zf.write(metadata_path, arcname="metadata.csv")
         zf.write(readme_path, arcname="README.txt")
         for local_path, arcname in files:
             zf.write(local_path, arcname=arcname)
 
 
-
 async def prezip_dataset_to_main_one(language: str, pct: float = 100, split: Optional[str] = None):
-    """Pre-zip dataset and upload to Azure with clean folder structure, starting from batch 18 onward."""
+    """Pre-zip dataset and upload to Azure with clean folder structure."""
     session_maker = get_async_session_maker()
 
-    # Load already processed files from tracking CSV
+    # Load already processed files
     processed_files = set()
     if os.path.exists(TRACKING_FILE):
         with open(TRACKING_FILE, newline="") as f:
@@ -141,7 +140,6 @@ async def prezip_dataset_to_main_one(language: str, pct: float = 100, split: Opt
     download_service = DownloadService(s3_bucket_name=settings.OBS_BUCKET_NAME)
 
     async with session_maker() as session:
-        # Get all samples
         samples_stream, total = await download_service.filter_core_stream(
             session=session,
             language=language,
@@ -156,30 +154,15 @@ async def prezip_dataset_to_main_one(language: str, pct: float = 100, split: Opt
             logger.info("No new samples to process.")
             return
 
-        # -----------------------------
-        # Batching logic: continue from batch 18
-        # -----------------------------
-        START_BATCH = 18
-        BATCH_SIZE = MAX_SINGLE_RUN
-        already_processed_count = (START_BATCH - 1) * BATCH_SIZE
-
-        # Skip already processed samples
-        all_samples_to_process = all_samples[already_processed_count:]
-        total_remaining = len(all_samples_to_process)
-
-        if total_remaining == 0:
-            logger.info(f"No new samples to process after batch {START_BATCH-1}.")
-            return
-
-        # Split into batches
-        if total_remaining <= BATCH_SIZE:
-            batches = [all_samples_to_process]
+        # Determine batches
+        if total_remaining <= MAX_SINGLE_RUN:
+            batches = [all_samples]
             logger.info(f"Processing all {total_remaining} files in a single batch.")
         else:
-            batches = [all_samples_to_process[i:i+BATCH_SIZE] for i in range(0, total_remaining, BATCH_SIZE)]
-            logger.info(f"Processing {total_remaining} files in {len(batches)} batches of up to {BATCH_SIZE} files each.")
+            batches = [all_samples[i:i+MAX_SINGLE_RUN] for i in range(0, total_remaining, MAX_SINGLE_RUN)]
+            logger.info(f"Processing {total_remaining} files in {len(batches)} batches of up to {MAX_SINGLE_RUN} files each.")
 
-        batch_index = START_BATCH
+        batch_index = 1
         for batch_samples in batches:
             logger.info(f"--- Batch {batch_index}: {len(batch_samples)} files ---")
             temp_dir = tempfile.mkdtemp(prefix=f"{language}_batch{batch_index}_")
@@ -219,9 +202,16 @@ async def prezip_dataset_to_main_one(language: str, pct: float = 100, split: Opt
             await asyncio.to_thread(create_zip_file, final_zip, files_for_zip, meta_path, readme_path)
 
             # Upload to Azure
-            blob_name = f"exports/{language}/{split}/Batch_{batch_index}.zip"
+            blob_name = f"exports2/{language}/{split}/Batch_{batch_index}.zip"
+
             logger.info(f"Uploading batch {batch_index} to Azure: {blob_name}")
-            await upload_to_azure(container_client, final_zip, blob_name)
+            # await upload_to_azure(container_client, final_zip, blob_name)
+
+            await multipart_upload_to_azure(
+                local_path=final_zip,
+                container_client=container_client,
+                blob_name=f"exports/{language}_{split}_{pct}%_batch[{batch_index}].zip"
+            )
 
             # Update tracking CSV
             with open(TRACKING_FILE, "a", newline="") as f:
@@ -244,8 +234,8 @@ async def prezip_dataset_to_main_one(language: str, pct: float = 100, split: Opt
 
 if __name__ == "__main__":
 
-    languages = ["naija"]
-    splits = ["train"]
+    languages = ["hausa"]
+    splits = ["train", "dev", "dev_test"]
     pct = 100
     BASE_CONCURRENT = 2  # default parallel combinations
 
@@ -309,5 +299,3 @@ if __name__ == "__main__":
         await asyncio.gather(*tasks)
 
     asyncio.run(main_loop())
-
-

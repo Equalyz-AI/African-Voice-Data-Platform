@@ -1,17 +1,20 @@
+import base64
 from azure.storage.blob.aio import BlobServiceClient
 from azure.storage.blob import BlobBlock
 import aiofiles, asyncio
 import logging
 import uuid
 
+from src.core.main_one_config import container_client
+
 logger = logging.getLogger(__name__)
 
-async def multipart_upload_to_azure(local_path, container, blob_name, connection_string):
+
+async def multipart_upload_to_azure(local_path, container_client, blob_name):
     block_size = 64 * 1024 * 1024  # 64MB
     blocks = []
 
-    blob_service = BlobServiceClient.from_connection_string(connection_string)
-    blob_client = blob_service.get_blob_client(container=container, blob=blob_name)
+    blob_client = container_client.get_blob_client(blob_name)
 
     async with aiofiles.open(local_path, "rb") as f:
         part_number = 0
@@ -20,14 +23,39 @@ async def multipart_upload_to_azure(local_path, container, blob_name, connection
             if not chunk:
                 break
 
-            block_id = str(uuid.uuid4())
+            block_id = base64.b64encode(uuid.uuid4().bytes).decode("utf-8")
             await blob_client.stage_block(block_id=block_id, data=chunk)
-            blocks.append(BlobBlock(block_id=block_id))
+
+            blocks.append(BlobBlock(block_id))
             part_number += 1
             logger.info(f"Uploaded block {part_number}")
 
     await blob_client.commit_block_list(blocks)
     logger.info(f"🎉 Multipart block upload complete: {blob_name}")
+
+
+
+
+
+async def upload_to_azure_blob(local_path, container_name, blob_name):
+    """Upload final ZIP to Azure Blob Storage."""
+    try:
+        blob_client = container_client.get_blob_client(blob_name)
+
+        async with aiofiles.open(local_path, "rb") as f:
+            data = await f.read()
+
+        await blob_client.upload_blob(
+            data,
+            overwrite=True,
+            content_type="application/zip"
+        )
+
+        logger.info(f"🎉 Uploaded to Azure Blob: {blob_name}")
+
+    except Exception as e:
+        logger.error(f"Azure upload failed: {e}")
+        raise
 
 
 
