@@ -350,6 +350,7 @@ class DownloadService:
         total_duration = sum(float(s.duration) for s in samples if s.duration)
 
         logger.info(f"\n\nThis is the total duration: {total_duration}\n\n")
+        logger.info(f"\n\nThe samples: {samples[:1]}\n\n")
 
         # -----------------------------
         # 2. Voicing counts
