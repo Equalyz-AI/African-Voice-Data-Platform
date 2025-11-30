@@ -349,6 +349,7 @@ class DownloadService:
         # # -----------------------------
         total_duration = sum(float(s.duration) for s in samples if s.duration)
 
+        logger.info(f"\n\nThis is the total duration: {total_duration}\n\n")
 
         # -----------------------------
         # 2. Voicing counts
@@ -434,6 +435,7 @@ class DownloadService:
                 return json.loads(cached)
 
         prefix = f"exports/{language}/{split}/"
+        print(f"This is the listing: {prefix}\n\n")
         logger.info(f"Listing Azure blobs under prefix: {prefix}")
 
         try:
@@ -496,10 +498,11 @@ class DownloadService:
                 "batches": results,
             }
 
+
             # Save result in Redis for 72 hour
             if redis:
                 await redis.set(cache_key, json.dumps(response), ex=259200)
-
+            print(f"This is the: {response}")
             return response
 
         except Exception as e:
