@@ -10,13 +10,68 @@ from tqdm.asyncio import tqdm
 import aiohttp
 from botocore.exceptions import BotoCoreError, ClientError
 
-from src.core.main_one_config import ACCOUNT_NAME, container_client
+from src.core.main_one_config import container_client
 from src.db.db import get_async_session_maker
-from src.download.main_one import multipart_upload_to_azure, upload_to_azure
+from src.download.main_one import upload_to_azure
 from src.download.s3_config import generate_obs_signed_url
 from src.download.s3_config_async import get_async_s3_client_factory
 from src.config import settings
 from src.download.utils import generate_readme
+import tarfile
+import zstandard as zstd
+
+def create_tar_zst_file(tar_zst_path, files, metadata_path, readme_path):
+    """Create a .tar.zst archive on disk."""
+    # .tar.zst
+    # First, create a plain tar in memory
+    with tempfile.NamedTemporaryFile(delete=False) as tmp_tar_file:
+        tmp_tar_path = tmp_tar_file.name
+
+    with tarfile.open(tmp_tar_path, "w") as tar:
+        # Add metadata and README
+        tar.add(metadata_path, arcname="metadata.csv")
+        tar.add(readme_path, arcname="README.txt")
+        # Add all audio files
+        for local_path, arcname in files:
+            tar.add(local_path, arcname=arcname)
+
+    # Compress tar with Zstandard
+    cctx = zstd.ZstdCompressor(level=3)  # Level 1–22, 3 is a good balance
+    with open(tmp_tar_path, "rb") as ifh, open(tar_zst_path, "wb") as ofh:
+        cctx.copy_stream(ifh, ofh)
+
+    # Remove temporary tar
+    os.remove(tmp_tar_path)
+
+
+def create_tar_gz_file(tar_path, files, metadata_path, readme_path):
+    """
+    Create a .tar.gz archive instead of zip.
+    - files: list of tuples (local_path, arcname)
+    - metadata_path, readme_path: paths to include in archive
+    """
+
+    # .tar.gz
+    with tarfile.open(tar_path, "w:gz") as tar:
+        # Add metadata.csv
+        tar.add(metadata_path, arcname="metadata.csv")
+        # Add README.txt
+        tar.add(readme_path, arcname="README.txt")
+        # Add all audio files
+        for local_path, arcname in files:
+            tar.add(local_path, arcname=arcname)
+
+
+
+def create_zip_file(zip_path, files, metadata_path, readme_path):
+    """Create ZIP file on disk without loading all files in memory."""
+    with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_STORED) as zf:
+        zf.write(metadata_path, arcname="metadata.csv")
+        zf.write(readme_path, arcname="README.txt")
+        for local_path, arcname in files:
+            zf.write(local_path, arcname=arcname)
+
+
 
 def normalize_wav_filename(raw_name: str) -> str:
     """
@@ -114,15 +169,6 @@ async def download_sample_to_temp_file(sample, temp_dir_path, semaphore):
 
 
 
-def create_zip_file(zip_path, files, metadata_path, readme_path):
-    """Create compressed ZIP using ZIP_LZMA."""
-    with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_LZMA) as zf:
-        zf.write(metadata_path, arcname="metadata.csv")
-        zf.write(readme_path, arcname="README.txt")
-        for local_path, arcname in files:
-            zf.write(local_path, arcname=arcname)
-
-
 async def prezip_dataset_to_main_one(language: str, pct: float = 100, split: Optional[str] = None):
     """Pre-zip dataset and upload to Azure with clean folder structure."""
     session_maker = get_async_session_maker()
@@ -198,20 +244,14 @@ async def prezip_dataset_to_main_one(language: str, pct: float = 100, split: Opt
                 await f_r.write(generate_readme(language, pct, False, len(batch_samples), f"Batch {batch_index}, split={split}"))
 
             # Create ZIP
-            final_zip = os.path.join(temp_dir, f"Batch_{batch_index}.zip")
-            await asyncio.to_thread(create_zip_file, final_zip, files_for_zip, meta_path, readme_path)
+            final_zip = os.path.join(temp_dir, f"Batch_{batch_index}.tar.zst")
+            await asyncio.to_thread(create_tar_zst_file, final_zip, files_for_zip, meta_path, readme_path)
 
             # Upload to Azure
-            blob_name = f"exports2/{language}/{split}/Batch_{batch_index}.zip"
+            blob_name = f"exports/{language}/{split}/Batch_{batch_index}.tar.zst"
 
             logger.info(f"Uploading batch {batch_index} to Azure: {blob_name}")
-            # await upload_to_azure(container_client, final_zip, blob_name)
-
-            await multipart_upload_to_azure(
-                local_path=final_zip,
-                container_client=container_client,
-                blob_name=f"exports/{language}_{split}_{pct}%_batch[{batch_index}].zip"
-            )
+            await upload_to_azure(container_client, final_zip, blob_name)
 
             # Update tracking CSV
             with open(TRACKING_FILE, "a", newline="") as f:
@@ -299,3 +339,4 @@ if __name__ == "__main__":
         await asyncio.gather(*tasks)
 
     asyncio.run(main_loop())
+
