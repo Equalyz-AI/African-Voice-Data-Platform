@@ -56,11 +56,8 @@ class UserService:
     
         if existing_user:
             if not existing_user.is_verified:
-                # Instead of raising UserAlreadyExists, signal frontend to verify email
-                raise HTTPException(
-                    status_code=409,
-                    detail="User exists but email is not verified. Please verify your email.",
-                    headers={"X-Action": "verify-email", "X-User-Email": user_data.email},
+                raise EmailNotVerified(
+                    message="User exists but email is not verified. Please verify your email."
                 )
             else:
                 # Already verified user
