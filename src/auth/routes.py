@@ -46,6 +46,11 @@ async def register_user(
         raise e
     
 
+
+
+
+
+
 @auth_router.post("/signin", response_model=LoginResponseModel)
 async def login(
     form_data: UserLoginModel,

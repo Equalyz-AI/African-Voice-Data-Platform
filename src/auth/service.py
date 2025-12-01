@@ -1,3 +1,4 @@
+from fastapi import HTTPException
 from sqlmodel import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Any, Optional
@@ -51,11 +52,22 @@ class UserService:
         is_google: Optional[bool] = False,
     ):
         """Create a new user in the database."""
-        if await self.user_exists(user_data.email, session):
-            raise UserAlreadyExists(
-                message="A user with this email already exists."
-            )
-        # if is_google else False,
+        existing_user = await self.get_user_by_email(user_data.email, session)
+    
+        if existing_user:
+            if not existing_user.is_verified:
+                # Instead of raising UserAlreadyExists, signal frontend to verify email
+                raise HTTPException(
+                    status_code=409,
+                    detail="User exists but email is not verified. Please verify your email.",
+                    headers={"X-Action": "verify-email", "X-User-Email": user_data.email},
+                )
+            else:
+                # Already verified user
+                raise UserAlreadyExists(
+                    message="A user with this email already exists."
+                )
+
         print("The data coming in: ", user_data)
 
         try:

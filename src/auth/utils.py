@@ -96,8 +96,9 @@ def decode_url_safe_token(token:str):
     except Exception as e:
         logging.error(str(e))
 
+
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 300
+ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
 
 def create_access_token(user, expires_delta: timedelta | None = None):
