@@ -353,14 +353,14 @@ IGBO_AUDIO_MAP = [
     },
   
     {
-        "audio_id": "ibo_ST06_350_R3",
-        "speaker_id": "IECT1F66",
-        "transcript": "[cs] Biotechnology [cs] na-enye ohere ịmepụta ụdị akpụkpọ [cs] cassava [cs] nwere [cs] vitamin [cs] dị elu, nke na-eme ka nri dị mma n’ebe ahụ.",
-        "duration": 7.06,
+        "audio_id": "ibo_HM4_6_R1",
+        "speaker_id": "IECT1F46",
+        "transcript": "Ọ na-asụbilata ahịhịa na-eto n'ihu ụlọ, ugboro ugboro, ka ihu ụlọ dị ọcha ma bụrụ nke na-adọta mmadụ, na-adọta mmadụ.",
+        "duration": 7.09,
         "gender": "female",
         "age_group": "15-29",
         "education": "Tertiary",
-        "domain": "AG",
+        "domain": "EV",
         "split": "train",
         "type": "spontaneous"
     },

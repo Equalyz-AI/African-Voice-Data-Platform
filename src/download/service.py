@@ -435,7 +435,7 @@ class DownloadService:
                 )
                 return json.loads(cached)
 
-        prefix = f"exports/{language}/{split}/"
+        prefix = f"exports2/{language}/{split}/"
         print(f"This is the listing: {prefix}\n\n")
         logger.info(f"Listing Azure blobs under prefix: {prefix}")
 
