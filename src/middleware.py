@@ -46,7 +46,8 @@ allowed_origins = [
     "https://africanvoices.io",
     "https://www.africanvoices.io",
     "https://main.d1wrs85izeeycs.amplifyapp.com",
-    "https://temp.d1yjz67kk47683.amplifyapp.com"
+    "https://temp.d1yjz67kk47683.amplifyapp.com",
+    "d34zgaw7tmeool.cloudfront.net"
 ]
 
 
@@ -162,6 +163,7 @@ def register_middleware(app: FastAPI):
         "api.africanvoices.io",
         "africanvoices.io",
         "www.africanvoices.io",
+        "d34zgaw7tmeool.cloudfront.net",
         "main.d1wrs85izeeycs.amplifyapp.com",
         "temp.d1yjz67kk47683.amplifyapp.com"
     ],
