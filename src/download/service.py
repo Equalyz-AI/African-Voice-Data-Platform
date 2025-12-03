@@ -437,7 +437,9 @@ class DownloadService:
         
         prefix = f"exports/{language}/{split}/"
         if language == "igbo":
-            prefix = f"exports2/igbo/{split}/"
+            prefix = f"exports2/{language}/{split}/"
+
+
         print(f"This is the listing: {prefix}\n\n")
         logger.info(f"Listing Azure blobs under prefix: {prefix}")
 
@@ -449,11 +451,12 @@ class DownloadService:
             for blob in blob_list:
                 name = blob.name
 
-                if not name.endswith(".zip"):
+                if not name.endswith((".zip", ".tar.zst")):
                     continue
 
                 try:
-                    batch_num = int(name.split("Batch_")[-1].split(".zip")[0])
+                    batch_str = name.split("Batch_")[-1].replace(".zip", "").replace(".tar.zst", "")
+                    batch_num = int(batch_str)
                 except:
                     batch_num = 99999
 
