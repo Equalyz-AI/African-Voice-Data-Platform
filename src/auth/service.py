@@ -106,7 +106,7 @@ class UserService:
         user = result.scalars().first()
         if not user:
             raise UserNotFound(
-                message="The user with this token does not exist"
+                message="Token expired or does not exist. Kindly generate a new one to continue"
             )
         return user
 

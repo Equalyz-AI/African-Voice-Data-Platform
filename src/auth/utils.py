@@ -45,26 +45,6 @@ def get_password_hash(password: str):
     return passwd_context.hash(password)
 
 
-# def create_access_token(
-#     user_data: dict, expiry: timedelta = None, refresh: bool = False
-# ):
-#     payload = {}
-
-#     payload["user"] = user_data
-#     payload["exp"] = datetime.now() + (
-#         expiry if expiry is not None else timedelta(seconds=ACCESS_TOKEN_EXPIRE_MINUTES)
-#     )
-#     payload["jti"] = str(uuid.uuid4())
-
-#     payload["refresh"] = refresh
-
-#     token = jwt.encode(
-#         payload=payload, key=settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM
-#     )
-
-#     return token
-
-
 def decode_token(token: str) -> dict:
     try:
         token_data = jwt.decode(
