@@ -437,7 +437,7 @@ class DownloadService:
         
         prefix = f"exports/{language}/{split}/"
         if language == "igbo":
-            prefix = f"exports2/{language}/{split}/"
+            prefix = f"exports2/igbo/{split}/"
         print(f"This is the listing: {prefix}\n\n")
         logger.info(f"Listing Azure blobs under prefix: {prefix}")
 
