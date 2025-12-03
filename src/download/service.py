@@ -434,8 +434,10 @@ class DownloadService:
                     f"Fetching from redis: {cache_key}\n\n{json.loads(cached)}\n\n"
                 )
                 return json.loads(cached)
-
-        prefix = f"exports2/igbo/dev/"
+        
+        prefix = f"exports/{language}/{split}/"
+        if language == "igbo":
+            prefix = f"exports2/{language}/{split}/"
         print(f"This is the listing: {prefix}\n\n")
         logger.info(f"Listing Azure blobs under prefix: {prefix}")
 
