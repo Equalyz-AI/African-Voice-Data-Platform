@@ -436,7 +436,7 @@ class DownloadService:
                 return json.loads(cached)
         
         prefix = f"exports/{language}/{split}/"
-        if language == "igbo":
+        if language in ["igbo", "yoruba"]:
             prefix = f"exports2/{language}/{split}/"
 
 
