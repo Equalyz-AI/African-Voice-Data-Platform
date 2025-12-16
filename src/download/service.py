@@ -437,6 +437,10 @@ class DownloadService:
         
         prefix = f"exports/{language}/{split}/"
         if language in ["igbo", "yoruba"]:
+            print("\n\n\n\nBranch:", f"exports/{language}/{split}/")
+            prefix = f"exports2/{language}/{split}/"
+
+        if language == "hausae" and split in ["dev", "dev_test"]:
             prefix = f"exports2/{language}/{split}/"
 
 

@@ -137,4 +137,6 @@ zipstream-new==1.1.8
 zipstream-ng==1.9.0
 azure-storage-blob==12.27.1
 azure-identity
-zstandard
+zstandard 
+pydub 
+xlsxwriter
