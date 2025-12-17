@@ -436,13 +436,13 @@ class DownloadService:
                 return json.loads(cached)
         
         prefix = f"exports/{language}/{split}/"
+
+        if language in ["hausa", "naija", "hausa", "igbo"] and split in ["dev", "dev_test"]:
+            prefix = f"exports2/{language}/{split}/"
+
         if language in ["igbo", "yoruba"]:
             print("\n\n\n\nBranch:", f"exports/{language}/{split}/")
             prefix = f"exports2/{language}/{split}/"
-
-        if language in ["hausa", "naija"] and split in ["dev", "dev_test"]:
-            prefix = f"exports2/{language}/{split}/"
-
 
         print(f"This is the listing: {prefix}\n\n")
         logger.info(f"Listing Azure blobs under prefix: {prefix}")
