@@ -37,6 +37,8 @@ neon_clean_dump.sql
 data/
 websock.py
 
+naija.py
+naija2.py
 
 src/**/*.pyc
 app.log

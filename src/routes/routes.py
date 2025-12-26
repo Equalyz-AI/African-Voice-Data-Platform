@@ -178,6 +178,7 @@ async def estimate_zip_size(
         pct=pct,
         session=session,
         split=split,
+        redis=redis,
     )
 
     #  Handle error or empty result

@@ -64,6 +64,25 @@ class DownloadService:
     
         self.s3_bucket_name = s3_bucket_name
     
+
+    # ----------------------------------------
+    # CACHE HELPER
+    # ----------------------------------------
+    async def _get_from_cache(self, redis: Optional[Redis], cache_key: str):
+        if redis:
+            cached = await redis.get(cache_key)
+            if cached:
+                logger.info(f"\n\nFetching from Redis cache: {cache_key}\n\n\n")
+                return json.loads(cached)
+        return None
+
+    async def _set_to_cache(self, redis: Optional[Redis], cache_key: str, value, expire: int = 3600):
+        if redis:
+            logger.info(f"\n\nSaving to  Redis cache: {cache_key}\n\n\n")
+            await redis.set(cache_key, json.dumps(value), ex=expire)
+
+
+    
     async def preview_audio_samples(
         self,
         session: AsyncSession,
@@ -132,16 +151,11 @@ class DownloadService:
         """
         Returns a list of all audio files for a language with signed OBS URLs.
         """
-        cache_key = f"preview_audios:{language}"
 
-        # If redis available, try to get cached data
-        if redis:
-            cached = await redis.get(cache_key)
-            if cached:
-                logger.info(
-                    f"Fetching from redis: {cache_key}\n\n{json.loads(cached)}\n\n"
-                )
-                return json.loads(cached)
+        cache_key = f"preview_audios:{language}:{split}:{category}"
+        cached = await self._get_from_cache(redis, cache_key)
+        if cached:
+            return cached
 
         result = []
 
@@ -168,9 +182,7 @@ class DownloadService:
             })
         
         # Save result in Redis for 1 hour
-        if redis:
-            await redis.set(cache_key, json.dumps(result), ex=3600)
-
+        await self._set_to_cache(redis, cache_key, result, expire=3600)
         return result
 
 
@@ -321,20 +333,12 @@ class DownloadService:
         redis: Optional[Redis] = None, 
     ) -> dict:
 
-        print(f"estimate_zip_size:{language}:{split}:{total_gb}\n\n\n")
-
-        cache_key = f"estimate_zip_size:{language}:{split}:{total_gb}"
-
-        # If redis available, try to get cached data
-        if redis:
-            cached = await redis.get(cache_key)
-            if cached:
-                logger.info(
-                    f"Fetching from redis: {cache_key}\n\n{json.loads(cached)}\n\n"
-                )
-                return json.loads(cached)
-
         
+
+        cache_key = f"estimate_zip_size:{language}:{split}:{pct}:{category}:{gender}:{age_group}:{education}:{domain}"
+        cached = await self._get_from_cache(redis, cache_key)
+        if cached:
+            return cached
         
         samples, total = await self.filter_core(
             session=session,
@@ -413,9 +417,7 @@ class DownloadService:
         }
 
         # Save result in Redis for 72 hour
-        if redis:
-            await redis.set(cache_key, json.dumps(result), ex=259200)
-
+        await self._set_to_cache(redis, cache_key, result, expire=259200)  # 72 hours
         return result
 
 
@@ -429,15 +431,9 @@ class DownloadService:
         redis: Optional[Redis] = None, 
     ):  
         cache_key = f"download_zip_from_azure:{language}:{split}:{pct}"
-
-        # If redis available, try to get cached data
-        if redis:
-            cached = await redis.get(cache_key)
-            if cached:
-                logger.info(
-                    f"Fetching from redis: {cache_key}\n\n{json.loads(cached)}\n\n"
-                )
-                return json.loads(cached)
+        cached = await self._get_from_cache(redis, cache_key)
+        if cached:
+            return cached
         
         prefix = f"exports2/{language}/{split}/"
 
@@ -516,9 +512,7 @@ class DownloadService:
 
 
             # Save result in Redis for 72 hour
-            if redis:
-                await redis.set(cache_key, json.dumps(response), ex=259200)
-            print(f"This is the: {response}")
+            await self._set_to_cache(redis, cache_key, response, expire=259200)  # 72 hours
             return response
 
         except Exception as e:
