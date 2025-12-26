@@ -341,3 +341,139 @@ if __name__ == "__main__":
 
     asyncio.run(main_loop())
 
+
+
+
+
+
+
+
+
+
+
+
+
+# async def prezip_dataset_to_main_one(language: str, pct: float = 100, split: str = None):
+#     session_maker = get_async_session_maker()
+
+#     from src.download.service import DownloadService
+#     # Load already processed IDs for resume
+#     processed = set()
+#     if os.path.exists(TRACKING_FILE):
+#         with open(TRACKING_FILE, "r", encoding="utf-8-sig") as f:
+#             for row in f:
+#                 processed.add(row.strip())
+#         logger.info(f"Loaded {len(processed)} processed IDs")
+
+#     download_service = DownloadService(s3_bucket_name=settings.OBS_BUCKET_NAME)
+
+#     async with session_maker() as session:
+#         stream, total = await download_service.filter_core_stream(
+#             session=session,
+#             language=language,
+#             pct=pct,
+#             split=split,
+#         )
+
+#         all_samples = [s async for s in stream]
+#         logger.info(f"Total samples in DB = {len(all_samples)}")
+
+#         # Skip batches if resuming
+#         # samples_to_process = skip_logic(all_samples)
+
+#         samples_to_process = all_samples
+#         # Split into batches
+#         batches = [
+#             samples_to_process[i:i+MAX_SINGLE_RUN]
+#             for i in range(0, len(samples_to_process), MAX_SINGLE_RUN)
+#         ]
+
+#         batch_index = START_BATCH
+
+#         for batch in batches:
+#             logger.info(f"========= BATCH {batch_index} | {len(batch)} FILES =========")
+#             temp_dir = tempfile.mkdtemp(prefix=f"{language}_b{batch_index}_")
+#             semaphore = asyncio.Semaphore(CONCURRENT_DOWNLOADS)
+
+#             files_for_zip = []
+#             metadata_rows = []
+
+#             pbar = tqdm(total=len(batch), desc=f"Batch {batch_index}")
+
+#             async def wrap(s):
+#                 res = await download_sample_to_temp_file(s, temp_dir, semaphore)
+#                 pbar.update(1)
+#                 return res
+
+#             results = await asyncio.gather(*[wrap(s) for s in batch])
+#             pbar.close()
+
+#             for r in results:
+#                 if not r:
+#                     continue
+#                 local_path, arcname, sample = r
+
+#                 flac_path = convert_wav_to_flac(local_path)
+#                 arcname = arcname.replace(".wav", ".flac")
+#                 files_for_zip.append((flac_path, arcname))
+
+#                 flac_path = convert_wav_to_flac(local_path, sample)
+
+#                 if not flac_path:
+#                     # already logged → just skip
+#                     continue
+
+#                 arcname = arcname.replace(".wav", ".flac")
+#                 files_for_zip.append((flac_path, arcname))
+
+
+#                 metadata_rows.append({
+#                     "speaker_id": sample.speaker_id,
+#                     "audio_id": sample.audio_id,
+#                     "transcript": sample.sentence or "",
+#                     "audio_path": arcname,
+#                     "gender": sample.gender,
+#                     "age_group": sample.age_group,
+#                     "education": sample.edu_level,
+#                     "duration": sample.duration,
+#                     "language": sample.language,
+#                     "snr": sample.snr,
+#                     "domain": sample.domain
+#                 })
+
+#             # Write metadata as proper Excel
+#             meta_path = os.path.join(temp_dir, "metadata.xlsx")
+#             df = pd.DataFrame(metadata_rows)
+#             df.to_excel(meta_path, index=False, engine="openpyxl")
+
+#             # Write README
+#             readme_path = os.path.join(temp_dir, "README.txt")
+#             async with aiofiles.open(readme_path, "w", encoding="utf-8") as f_r:
+#                 from src.download.utils import generate_readme
+#                 await f_r.write(generate_readme(language, pct, False, len(batch), f"Batch {batch_index}, split={split}"))
+
+#             # Create zip
+#             # zip_path = os.path.join(temp_dir, f"Batch_{batch_index}.zip")
+#             # await asyncio.to_thread(create_zip_file, zip_path, files_for_zip, meta_path, readme_path)
+
+#             final_tar_zst = os.path.join(temp_dir, f"Batch_{batch_index}.tar.zst")
+#             await asyncio.to_thread(create_tar_zst_file, final_tar_zst, files_for_zip, meta_path, readme_path)
+
+
+#             # Upload
+#             # blob = f"exports2/{language}/{split}/Batch_{batch_index}.zip"
+#             # logger.info(f"Uploading: {blob}")
+#             # await upload_to_azure(container_client, zip_path, blob)
+
+#              # Upload to Azure
+#             blob_name = f"exports2/{language}/{split}/Batch_{batch_index}.tar.zst"
+#             logger.info(f"Uploading batch {batch_index} to Azure: {blob_name}")
+#             await upload_to_azure(container_client, final_tar_zst, blob_name)
+
+
+#             # Track processed
+#             with open(TRACKING_FILE, "a", encoding="utf-8-sig") as f:
+#                 for s in batch:
+#                     f.write(f"{s.sentence_id}\n")
+
+#             batch_index += 1

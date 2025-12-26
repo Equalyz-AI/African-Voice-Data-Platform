@@ -54,9 +54,9 @@ class DomainDistributionItem(BaseModel):
 
 
 class EstimatedSizeResponse(BaseModel):
-    estimated_size_in_bytes: int
-    estimated_size_in_mb: float
-    estimated_size_in_gb: float
+    estimated_size_in_bytes: Optional[int] = None
+    estimated_size_in_mb:  Optional[float] = None
+    estimated_size_in_gb:  Optional[float] = None
     sample_count: int
     total_duration_seconds: float
 
@@ -77,6 +77,7 @@ class AzureBatchItem(BaseModel):
     key: str
     batch: int
     size_mb: float
+    metadata: Optional[EstimatedSizeResponse] = None
     last_modified: datetime
     download_url: str
 

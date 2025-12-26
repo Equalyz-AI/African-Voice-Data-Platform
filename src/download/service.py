@@ -2,8 +2,9 @@ from datetime import datetime, timedelta
 import os, json
 from re import split
 from azure.storage.blob import BlobSasPermissions, generate_blob_sas
-from fastapi import HTTPException, BackgroundTasks
-from fastapi.responses import StreamingResponse
+from collections import defaultdict
+from itertools import islice
+from fastapi import HTTPException
 from sqlmodel import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional, Tuple
@@ -33,6 +34,9 @@ AUDIO_SAMPLE_RATE = 48000  # Hz
 AUDIO_BIT_DEPTH = 16       # bits
 AUDIO_CHANNELS = 1         # mono
 COMPRESSION_RATIO = 0.65 
+
+
+BATCH_SIZE = 8000
 
 
 def upload_to_s3(local_path: str, bucket_name: str, object_name: str):
@@ -435,14 +439,7 @@ class DownloadService:
                 )
                 return json.loads(cached)
         
-        prefix = f"exports/{language}/{split}/"
-
-        if language in ["hausa", "naija", "hausa", "igbo"] and split in ["dev", "dev_test"]:
-            prefix = f"exports2/{language}/{split}/"
-
-        if language in ["igbo", "yoruba"]:
-            print("\n\n\n\nBranch:", f"exports/{language}/{split}/")
-            prefix = f"exports2/{language}/{split}/"
+        prefix = f"exports2/{language}/{split}/"
 
         print(f"This is the listing: {prefix}\n\n")
         logger.info(f"Listing Azure blobs under prefix: {prefix}")
@@ -451,6 +448,12 @@ class DownloadService:
             blob_list = container_client.list_blobs(name_starts_with=prefix)
 
             results = []
+
+            batch_metadata_map = await self.compute_all_batch_metadata_streamed(
+                session=session,
+                language=language,
+                split=split,
+            )
 
             for blob in blob_list:
                 name = blob.name
@@ -487,12 +490,15 @@ class DownloadService:
                 container_base_url = container_client.url
                 download_url = f"{container_base_url}/{blob_path}?{sas_token}"
 
-                results.append({
+                metadata = batch_metadata_map.get(batch_num, {"sample_count": 0})
+                
+                results.append({    
                     "key": blob_name_only,
                     "batch": batch_num,
                     "size_mb": round(blob.size / (1024 * 1024), 2),
                     "last_modified": blob.last_modified.isoformat(),
                     "download_url": await self.strip_sas_token(download_url),
+                    "metadata": metadata,
                 })
 
             if not results:
@@ -531,3 +537,87 @@ class DownloadService:
             str: Base blob URL without SAS token.
         """
         return url.split("?", 1)[0]
+
+    
+
+    def _compute_metadata_from_samples(self, samples: list[AudioSample]) -> dict:
+        if not samples:
+            return {"sample_count": 0}
+
+        total_duration = sum(float(s.duration or 0) for s in samples)
+
+        male = sum(1 for s in samples if (s.gender or "").lower() == "male")
+        female = sum(1 for s in samples if (s.gender or "").lower() == "female")
+        total = male + female
+
+        unique_male = len({s.speaker_id for s in samples if (s.gender or "").lower() == "male"})
+        unique_female = len({s.speaker_id for s in samples if (s.gender or "").lower() == "female"})
+
+        domain_counts = defaultdict(int)
+        for s in samples:
+            if s.domain:
+                domain_counts[s.domain] += 1
+
+        return {
+            "sample_count": len(samples),
+            "total_duration_seconds": round(total_duration, 2),
+
+            "male_voicing_count": male,
+            "female_voicing_count": female,
+            "pct_male_voicings": round((male / total) * 100, 2) if total else 0,
+            "pct_female_voicings": round((female / total) * 100, 2) if total else 0,
+
+            "unique_male_speakers": unique_male,
+            "unique_female_speakers": unique_female,
+
+            "domain_distribution": {
+                d: {
+                    "count": c,
+                    "pct": round((c / total) * 100, 2) if total else 0
+                }
+                for d, c in domain_counts.items()
+            }
+        }
+
+    
+    async def compute_all_batch_metadata_streamed(
+        self,
+        session: AsyncSession,
+        language: str,
+        split: str,
+        batch_size: int = 8000,
+    ) -> dict[int, dict]:
+        """
+        Stream all samples once, chunk sequentially, and compute metadata per batch.
+        Returns: { batch_num: metadata }
+        """
+
+        query = (
+            select(AudioSample)
+            .where(
+                AudioSample.language == language,
+                AudioSample.split == split,
+            )
+            .order_by(AudioSample.id)  # MUST match zipping order
+        )
+
+        stream = await session.stream_scalars(query)
+
+        batch_metadata: dict[int, dict] = {}
+        batch_num = 1
+
+        async def async_chunked(iterator, size):
+            chunk = []
+            async for item in iterator:
+                chunk.append(item)
+                if len(chunk) == size:
+                    yield chunk
+                    chunk = []
+            if chunk:
+                yield chunk
+
+        async for samples in async_chunked(stream, batch_size):
+            batch_metadata[batch_num] = self._compute_metadata_from_samples(samples)
+            batch_num += 1
+
+        return batch_metadata

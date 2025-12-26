@@ -107,8 +107,8 @@ def generate_readme(language: str, pct: int, as_excel: bool, num_samples: int, s
         ├── metadata.{"xlsx" if as_excel else "csv"}   - Tabular data with metadata
         ├── README.txt                                 - This file
         └── audio/                                     - Folder with audio clips
-            ├── {sentence_id}.wav
-            ├── {sentence_id}.wav
+            ├── {sentence_id}.flac
+            ├── {sentence_id}.flac
             └── ...
 
         📌 Notes

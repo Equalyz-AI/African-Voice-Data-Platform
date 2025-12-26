@@ -23,7 +23,7 @@ google_upload_to_db.py
 drive_client.py
 account.json
 push_to_db_local_sheets.py
-naija.py
+# naija.py
 list_folder_on_s3.py
 index.py
 list_folder_on_s3.py
