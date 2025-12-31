@@ -77,6 +77,7 @@ class AzureBatchItem(BaseModel):
     key: str
     batch: int
     size_mb: float
+    size_gb: Optional[float]
     metadata: Optional[EstimatedSizeResponse] = None
     last_modified: datetime
     download_url: str

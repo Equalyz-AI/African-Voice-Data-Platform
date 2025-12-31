@@ -239,7 +239,7 @@ async def download_zip(
 
     language = language.lower()
     split = split.value
-
+    
     return await download_service.download_zip_from_azure(
         language=language,
         pct=pct,

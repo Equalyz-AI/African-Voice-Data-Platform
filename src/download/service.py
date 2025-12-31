@@ -420,49 +420,160 @@ class DownloadService:
         await self._set_to_cache(redis, cache_key, result, expire=259200)  # 72 hours
         return result
 
+    async def format_size(self, size_bytes):
+        """Convert bytes to human-readable format."""
+        for unit in ["B", "KB", "MB", "GB", "TB"]:
+            if size_bytes < 1024:
+                return f"{size_bytes:.2f} {unit}"
+            size_bytes /= 1024
+        return f"{size_bytes:.2f}"
 
-    
+
+    # async def download_zip_from_azure(
+    #     self,
+    #     language: str,
+    #     pct: float,
+    #     session,
+    #     split: Optional[Split] = None,
+    #     redis: Optional[Redis] = None, 
+    # ):  
+    #     cache_key = f"download_zip_from_azure:{language}:{split}:{pct}"
+    #     cached = await self._get_from_cache(redis, cache_key)
+    #     if cached:
+    #         return cached
+        
+    #     prefix = f"exports/{language}/{split}/"
+        
+
+    #     print(f"This is the listing: {prefix}\n\n")
+    #     logger.info(f"Listing Azure blobs under prefix: {prefix}")
+
+    #     try:
+    #         blob_list = container_client.list_blobs(name_starts_with=prefix)
+
+    #         results = []
+
+    #         batch_metadata_map = await self.compute_all_batch_metadata_streamed(
+    #             session=session,
+    #             language=language,
+    #             split=split,
+    #         )
+
+    #         for blob in blob_list:
+    #             name = blob.name
+
+    #             if not name.endswith((".zip", ".tar.zst")):
+    #                 continue
+
+    #             try:
+    #                 batch_str = name.split("Batch_")[-1].replace(".zip", "").replace(".tar.zst", "")
+    #                 batch_num = int(batch_str)
+    #             except:
+    #                 batch_num = 99999
+
+    #             sas_token = generate_blob_sas(
+    #                 account_name=container_client.account_name,
+    #                 container_name=container_client.container_name,
+    #                 blob_name=name,
+    #                 account_key=ACCOUNT_KEY,
+    #                 permission=BlobSasPermissions(read=True),
+    #                 expiry=datetime.utcnow() + timedelta(hours=6),
+    #                 protocol="https",
+    #                 version=API_VERSION
+    #             )
+
+    #             # FIX: Remove container name from path
+    #             blob_path = name
+    #             prefix_to_strip = f"{container_client.container_name}/"
+
+    #             if blob_path.startswith(prefix_to_strip):
+    #                 blob_path = blob_path[len(prefix_to_strip):]
+
+    #             blob_name_only = PurePosixPath(name).name
+
+    #             container_base_url = container_client.url
+    #             download_url = f"{container_base_url}/{blob_path}?{sas_token}"
+
+    #             metadata = batch_metadata_map.get(batch_num, {"sample_count": 0})
+                
+    #             results.append({    
+    #                 "key": blob_name_only,
+    #                 "batch": batch_num,
+    #                 "size_mb": round(blob.size / (1024 * 1024), 2),
+    #                 "last_modified": blob.last_modified.isoformat(),
+    #                 "download_url": await self.strip_sas_token(download_url),
+    #                 "metadata": metadata,
+    #             })
+
+    #         if not results:
+    #             return {"message": f"No zip files found for {language}-{split}-{pct}%"}
+
+    #         results.sort(key=lambda x: x["batch"])
+
+    #         response =  {
+    #             "language": language,
+    #             "split": split,
+    #             "pct": pct,
+    #             "total_batches": len(results),
+    #             "batches": results,
+    #         }
+
+
+    #         # Save result in Redis for 72 hour
+    #         await self._set_to_cache(redis, cache_key, response, expire=259200)  # 72 hours
+    #         return response
+
+    #     except Exception as e:
+    #         logger.error(f"Azure listing/signing failed: {e}", exc_info=True)
+    #         return {"error": str(e)}
+
+
     async def download_zip_from_azure(
         self,
         language: str,
         pct: float,
-        session,
-        split: Optional[Split] = None,
-        redis: Optional[Redis] = None, 
-    ):  
+        session: AsyncSession,
+        split: Optional[str] = None,
+        redis: Optional[Redis] = None,
+        number_of_batches: int = 3,  # match prezip
+    ):
+        """
+        Download all pre-zipped batches for a language+split and return metadata + actual blob sizes.
+        """
         cache_key = f"download_zip_from_azure:{language}:{split}:{pct}"
         cached = await self._get_from_cache(redis, cache_key)
         if cached:
             return cached
-        
-        prefix = f"exports2/{language}/{split}/"
 
-        print(f"This is the listing: {prefix}\n\n")
+        prefix = f"exports2/{language}/{split}/"
         logger.info(f"Listing Azure blobs under prefix: {prefix}")
 
         try:
             blob_list = container_client.list_blobs(name_starts_with=prefix)
 
-            results = []
-
+            # Compute batch metadata aligned with prezip batches
             batch_metadata_map = await self.compute_all_batch_metadata_streamed(
                 session=session,
                 language=language,
                 split=split,
+                number_of_batches=number_of_batches,
             )
 
+            results = []
             for blob in blob_list:
                 name = blob.name
 
                 if not name.endswith((".zip", ".tar.zst")):
                     continue
 
+                # Extract batch number from blob name
                 try:
                     batch_str = name.split("Batch_")[-1].replace(".zip", "").replace(".tar.zst", "")
                     batch_num = int(batch_str)
-                except:
-                    batch_num = 99999
+                except Exception:
+                    batch_num = 99999  # fallback
 
+                # Generate SAS token (optional, remove if not needed)
                 sas_token = generate_blob_sas(
                     account_name=container_client.account_name,
                     container_name=container_client.container_name,
@@ -474,24 +585,25 @@ class DownloadService:
                     version=API_VERSION
                 )
 
-                # FIX: Remove container name from path
                 blob_path = name
                 prefix_to_strip = f"{container_client.container_name}/"
-
                 if blob_path.startswith(prefix_to_strip):
                     blob_path = blob_path[len(prefix_to_strip):]
 
                 blob_name_only = PurePosixPath(name).name
-
                 container_base_url = container_client.url
                 download_url = f"{container_base_url}/{blob_path}?{sas_token}"
 
+                # Attach metadata (computed from samples) and actual blob size
                 metadata = batch_metadata_map.get(batch_num, {"sample_count": 0})
-                
-                results.append({    
+
+
+                size_gb = (await self.format_size(blob.size)).split(' ')[0]
+                results.append({
                     "key": blob_name_only,
                     "batch": batch_num,
                     "size_mb": round(blob.size / (1024 * 1024), 2),
+                    "size_gb": float(size_gb),
                     "last_modified": blob.last_modified.isoformat(),
                     "download_url": await self.strip_sas_token(download_url),
                     "metadata": metadata,
@@ -502,7 +614,7 @@ class DownloadService:
 
             results.sort(key=lambda x: x["batch"])
 
-            response =  {
+            response = {
                 "language": language,
                 "split": split,
                 "pct": pct,
@@ -510,9 +622,9 @@ class DownloadService:
                 "batches": results,
             }
 
+            # Cache for 72 hours
+            await self._set_to_cache(redis, cache_key, response, expire=259200)
 
-            # Save result in Redis for 72 hour
-            await self._set_to_cache(redis, cache_key, response, expire=259200)  # 72 hours
             return response
 
         except Exception as e:
@@ -532,7 +644,6 @@ class DownloadService:
         """
         return url.split("?", 1)[0]
 
-    
 
     def _compute_metadata_from_samples(self, samples: list[AudioSample]) -> dict:
         if not samples:
@@ -574,18 +685,62 @@ class DownloadService:
         }
 
     
+    # async def compute_all_batch_metadata_streamed(
+    #     self,
+    #     session: AsyncSession,
+    #     language: str,
+    #     split: str,
+    #     batch_size: int = 8000,
+    # ) -> dict[int, dict]:
+    #     """
+    #     Stream all samples once, chunk sequentially, and compute metadata per batch.
+    #     Returns: { batch_num: metadata }
+    #     """
+
+    #     query = (
+    #         select(AudioSample)
+    #         .where(
+    #             AudioSample.language == language,
+    #             AudioSample.split == split,
+    #         )
+    #         .order_by(AudioSample.id)  # MUST match zipping order
+    #     )
+
+    #     stream = await session.stream_scalars(query)
+
+    #     batch_metadata: dict[int, dict] = {}
+    #     batch_num = 1
+
+    #     async def async_chunked(iterator, size):
+    #         chunk = []
+    #         async for item in iterator:
+    #             chunk.append(item)
+    #             if len(chunk) == size:
+    #                 yield chunk
+    #                 chunk = []
+    #         if chunk:
+    #             yield chunk
+
+    #     async for samples in async_chunked(stream, batch_size):
+    #         batch_metadata[batch_num] = self._compute_metadata_from_samples(samples)
+    #         batch_num += 1
+
+    #     return batch_metadata
+
+    
     async def compute_all_batch_metadata_streamed(
         self,
         session: AsyncSession,
         language: str,
         split: str,
-        batch_size: int = 8000,
+        number_of_batches: int = 3,  # dynamically split
     ) -> dict[int, dict]:
         """
-        Stream all samples once, chunk sequentially, and compute metadata per batch.
+        Stream all samples once, split into `number_of_batches`, compute metadata per batch.
         Returns: { batch_num: metadata }
         """
 
+        # Query all samples for this language+split
         query = (
             select(AudioSample)
             .where(
@@ -596,22 +751,19 @@ class DownloadService:
         )
 
         stream = await session.stream_scalars(query)
+        samples = [s async for s in stream]
 
+        total_samples = len(samples)
+        if total_samples == 0:
+            return {}
+
+        batch_size = math.ceil(total_samples / number_of_batches)
         batch_metadata: dict[int, dict] = {}
-        batch_num = 1
 
-        async def async_chunked(iterator, size):
-            chunk = []
-            async for item in iterator:
-                chunk.append(item)
-                if len(chunk) == size:
-                    yield chunk
-                    chunk = []
-            if chunk:
-                yield chunk
-
-        async for samples in async_chunked(stream, batch_size):
-            batch_metadata[batch_num] = self._compute_metadata_from_samples(samples)
-            batch_num += 1
+        for batch_index in range(number_of_batches):
+            start = batch_index * batch_size
+            end = min(start + batch_size, total_samples)
+            batch_samples = samples[start:end]
+            batch_metadata[batch_index + 1] = self._compute_metadata_from_samples(batch_samples)
 
         return batch_metadata
